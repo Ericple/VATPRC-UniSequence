@@ -2,6 +2,7 @@
 #include "SequenceWorks.h"
 
 using namespace std;
+using namespace EuroScopePlugIn;
 
 #ifndef COPYRIGHTS
 #define AUTHOR "Ericple Garrison"
@@ -25,15 +26,18 @@ public:
 	~UniSequence();
 	future<string> bufferQueueString;
 	virtual bool OnCompileCommand(const char*);
-	virtual void OnGetTagItem(EuroScopePlugIn::CFlightPlan, EuroScopePlugIn::CRadarTarget, 
+	virtual void OnGetTagItem(CFlightPlan, CRadarTarget, 
 		int, int, char[], int*, COLORREF*, double*);
 	void Messager(string);
 	virtual void OnTimer(int);
 	vector<string> airportList;
 	map<string, string> QueueCache;
 private:
-	string FetchQueue(string); // fetch queue data from network to target address
+	// fetch queue data from network to target address
+	void FetchQueue(string);
+	// Sync local sequence data
+	void SyncQueue(vector<string>);
 	void FetchQueueSocket();
-	int timerInterval = 5;
+	int timerInterval = 10;
 };
 

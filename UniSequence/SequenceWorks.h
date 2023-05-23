@@ -32,6 +32,8 @@ public:
 	~SequenceWorks();
 	std::list<SeqN> Sequence;
 	bool UpdateSeq(CFlightPlan, int);
+	void SyncSeq(std::string, int);
+	int GetSeq(std::string);
 	bool AddToSeq(CFlightPlan);
 	bool DeleteFromSeq(CFlightPlan);
 	bool PatchRemoteStatus(CFlightPlan, int);

@@ -1,0 +1,2 @@
+fsd.connect.vatsim.net AUTOMATIC
+sweatbox.vatsim.net SweatBox

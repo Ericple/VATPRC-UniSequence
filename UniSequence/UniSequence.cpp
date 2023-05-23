@@ -5,6 +5,8 @@
 using namespace std;
 using nlohmann::json;
 
+bool globalIsOperating = false;
+
 UniSequence::UniSequence(void)
 {
 	RegisterTagItemType("Sequence", SEQUENCE_TAGITEM_TYPE_CODE);
@@ -59,18 +61,70 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 		}
 		return true;
 	}
+	// For debug use
+	if (cmd.substr(0, 4) == ".SQS")
+	{
+		char i[10];
+		_itoa_s(Sequence.size(), i, 10);
+		Messager("Current in sequence: ");
+		Messager(i);
+		return true;
+	}
+	if (cmd.substr(0, 4) == ".SQP")
+	{
+		char i[10];
+		_itoa_s(airportList.size(), i, 10);
+		Messager("Current in list: ");
+		Messager(i);
+		return true;
+	}
 
 	return false;
 }
 
-string UniSequence::FetchQueue(string airport)
+static void FetchQueueS(string airport, UniSequence* instance)
+{
+	if (!globalIsOperating)
+	{
+		globalIsOperating = true;
+		httplib::Client client(SERVER_ADDRESS_PRC, SERVER_PORT_PRC);
+		client.set_connection_timeout(5, 0);
+		if (auto res = client.Get(SERVER_RESTFUL_VER + airport + "/queue"))
+		{
+			if (res->status != 200) {
+				OutputDebugStringA("Unexpected result status, fetch failed\n");
+				return;
+			}
+			json queue = json::parse(res->body);
+			instance->Messager("Sequence of " + airport + " fetched.");
+			for (auto& el : queue["data"])
+			{
+				if (!el["callsign"].is_null() && !el["status"].is_null())
+				{
+					string callsign = el["callsign"];
+					int status = el["status"];
+					instance->SyncSeq(callsign, status);
+				}
+			}
+		}
+		else
+		{
+			OutputDebugStringA(httplib::to_string(res.error()).c_str());
+		}
+		globalIsOperating = false;
+	}
+}
+void UniSequence::FetchQueue(string airport)
 {
 	httplib::Client client(SERVER_ADDRESS_PRC, SERVER_PORT_PRC);
 	client.set_connection_timeout(5, 0);
-	if (auto res = client.Get("/v1/" + airport + "/queue"))
+	if (auto res = client.Get(SERVER_RESTFUL_VER + airport + "/queue"))
 	{
-		if (res->status != 200) return "HTTPERR:" + httplib::to_string(res.error());
-		json queue = json::parse(FetchQueue(res->body));
+		if (res->status != 200) {
+			OutputDebugStringA("Unexpected result status, fetch failed\n");
+			return;
+		}
+		json queue = json::parse(res->body);
 		Messager("Sequence of " + airport + " fetched.");
 		for (auto& el : queue["data"])
 		{
@@ -78,14 +132,34 @@ string UniSequence::FetchQueue(string airport)
 			{
 				string callsign = el["callsign"];
 				int status = el["status"];
+				SyncSeq(callsign, status);
 			}
 		}
-		return res->body;
 	}
 	else
 	{
-		return "Get failed: " + httplib::to_string(res.error());
+		OutputDebugStringA(httplib::to_string(res.error()).c_str());
 	}
+}
+
+void UniSequence::SyncQueue(vector<string> airports)
+{
+	thread syncThread([&] {
+		OutputDebugStringA("Attempting to fetch queue of airport\n");
+		for (auto itr = airports.begin(); itr != airports.end(); itr++)
+		{
+			try
+			{
+				FetchQueueS(*itr, this);
+			}
+			catch (const std::exception& e)
+			{
+				OutputDebugStringA(e.what());
+			}
+		}
+		});
+	syncThread.detach();
+	
 }
 
 void UniSequence::FetchQueueSocket()
@@ -100,7 +174,45 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	if (!fp.IsValid() || !rt.IsValid()) return;
 	// check if item code is what we need to handle
 	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;
-	sprintf_s(sItemString, 5, "TEST");
+	switch (itemCode)
+	{
+	case SEQUENCE_TAGITEM_TYPE_CODE:
+		int status = GetSeq(fp.GetCallsign());
+		switch (status)
+		{
+		case AIRCRAFT_STATUS_NULL:
+			sprintf_s(sItemString, 5, "NULL");
+			break;
+		case AIRCRAFT_STATUS_WFCR:
+			sprintf_s(sItemString, 5, "WFCR");
+			break;
+		case AIRCRAFT_STATUS_CLRD:
+			sprintf_s(sItemString, 5, "CLRD");
+			break;
+		case AIRCRAFT_STATUS_WFPU:
+			sprintf_s(sItemString, 5, "WFPU");
+			break;
+		case AIRCRAFT_STATUS_PUSH:
+			sprintf_s(sItemString, 5, "PUSH");
+			break;
+		case AIRCRAFT_STATUS_WFTX:
+			sprintf_s(sItemString, 5, "WFTX");
+		case AIRCRAFT_STATUS_TAXI:
+			sprintf_s(sItemString, 5, "TAXI");
+			break;
+		case AIRCRAFT_STATUS_WFTO:
+			sprintf_s(sItemString, 5, "WFTO");
+			break;
+		case AIRCRAFT_STATUS_TOGA:
+			sprintf_s(sItemString, 5, "TOGA");
+			break;
+		default: // Get status of -1, represent that it is not in sequence.
+			AddToSeq(fp);
+			break;
+		}
+		break;
+	}
+	
 	// Every time the tag refresh, we need to fetch seq data from network.
 
 	return;
@@ -111,35 +223,7 @@ void UniSequence::OnTimer(int interval)
 	if (!(interval % timerInterval))
 	{
 		if (airportList.size() == 0) return;
-		for (const string airport : airportList)
-		{
-			try
-			{
-				string result = FetchQueue(airport);
-				Messager(result);
-				/*if (json queue = json::parse(FetchQueue(airport)))
-				{
-					for (auto& el : queue["data"])
-					{
-						if (!el["callsign"].is_null() && !el["status"].is_null())
-						{
-							string callsign = el["callsign"];
-							int status = el["status"];
-						}
-					}
-					Messager("Sequence of " + airport + " fetched.");
-				}
-				else
-				{
-					Messager(result);
-				}*/
-			}
-			catch (exception const& e)
-			{
-				Messager("Error occured during itering queue json");
-				Messager(e.what());
-				continue;
-			}
-		}
+		Messager("Refreshing queue...");
+		SyncQueue(airportList);
 	}
 }

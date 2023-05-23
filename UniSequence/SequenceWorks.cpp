@@ -43,6 +43,31 @@ bool SequenceWorks::UpdateSeq(CFlightPlan fp, int status)
 	Messager("Err: Attempting to update an unexist element.");
 	return false;
 }
+
+void SequenceWorks::SyncSeq(string callsign, int status)
+{
+	for (auto& seqNode : Sequence)
+	{
+		if (seqNode.fp.GetCallsign() == callsign)
+		{
+			seqNode.status = status;
+			return;
+		}
+	}
+}
+
+int SequenceWorks::GetSeq(string callsign)
+{
+	for (auto& seqNode : Sequence)
+	{
+		if (seqNode.fp.GetCallsign() == callsign)
+		{
+			return seqNode.status;
+		}
+	}
+	return -1;
+}
+
 bool SequenceWorks::AddToSeq(CFlightPlan fp)
 {
 	try

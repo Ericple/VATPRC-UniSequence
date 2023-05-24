@@ -46,7 +46,6 @@ UniSequence::UniSequence(void) : CPlugIn(
 			{
 				if (auto result = requestClient.Get(SERVER_RESTFUL_VER + airport + "/queue"))
 				{
-					Messager("Start sync.");
 					json resObj = json::parse(result->body);
 					int seqNumber = 1;
 					for (auto& seqObj : resObj["data"])
@@ -55,7 +54,6 @@ UniSequence::UniSequence(void) : CPlugIn(
 						SyncSeqNum(seqObj["callsign"], seqNumber);
 						seqNumber++;
 					}
-					Messager("Sync complete.");
 				}
 				else
 				{
@@ -165,7 +163,14 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 			if (result->status == 200)
 			{
 				SyncSeq(fp.GetCallsign(), status);
-				Messager("Status updated");
+				json resObj = json::parse(result->body);
+				int seqNumber = 1;
+				for (auto& seqObj : resObj["data"])
+				{
+					SyncSeq(seqObj["callsign"], seqObj["status"]);
+					SyncSeqNum(seqObj["callsign"], seqNumber);
+					seqNumber++;
+				}
 			}
 		}
 		else
@@ -209,7 +214,17 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 			};
 			if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", reqBody.dump(), "application/json"))
 			{
-				Messager("Sequence order edited.");
+				if (res->status == 200)
+				{
+					json resObj = json::parse(res->body);
+					int seqNumber = 1;
+					for (auto& seqObj : resObj["data"])
+					{
+						SyncSeq(seqObj["callsign"], seqObj["status"]);
+						SyncSeqNum(seqObj["callsign"], seqNumber);
+						seqNumber++;
+					}
+				}
 			}
 			else
 			{

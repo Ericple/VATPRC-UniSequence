@@ -1,5 +1,4 @@
 #pragma once
-#include "SequenceWorks.h"
 
 using namespace std;
 using namespace EuroScopePlugIn;
@@ -8,36 +7,78 @@ using namespace EuroScopePlugIn;
 #define AUTHOR "Ericple Garrison"
 #define GITHUB_LINK "Closed source for now"
 #define DIVISION "VATPRC"
+#define PLUGIN_NAME "UniSequence"
+#define PLUGIN_VER "1.0.0"
+#define PLUGIN_AUTHOR "Ericple Garrison"
+#define PLUGIN_COPYRIGHT "GPL v3"
 #endif
 
 #ifndef Code
-#define SEQUENCE_TAGITEM_TYPE_CODE 1
-#define SEQUENCE_TAGITEM_FUNC_CODE 1
+#define SEQUENCE_TAGITEM_TYPE_CODE 35
+#define SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE 50
+#define FUNC_SWITCH_TO_WFCR 84
+#define FUNC_SWITCH_TO_CLRD 86
+#define FUNC_SWITCH_TO_WFPU 93
+#define FUNC_SWITCH_TO_PUSH 99
+#define FUNC_SWITCH_TO_WFTX 102
+#define FUNC_SWITCH_TO_TAXI 106
+#define FUNC_SWITCH_TO_WFTO 110
+#define FUNC_SWITCH_TO_TOGA 114
 #endif // !Code
 
 #ifndef LIMITATIONS
 #define MAXIMUM_AIRPORT_LIST_COUNT 100
 #endif // !LIMITATIONS
 
-class UniSequence : public SequenceWorks
+#ifndef AIRCRAFT_STATUS
+#define STATUS_TEXT_PLACE_HOLDER "________"
+#define AIRCRAFT_STATUS_NULL 999 // EMPTY STATUS
+#define STATUS_TEXT_NULL "-------"
+#define AIRCRAFT_STATUS_WFCR 70 // WAITING FOR CLEARANCE
+#define STATUS_TEXT_WFCR "-WFCR"
+#define AIRCRAFT_STATUS_CLRD 60 // CLEARANCE GOT
+#define STATUS_TEXT_CLRD "-CLRD"
+#define AIRCRAFT_STATUS_WFPU 50 // WATING FOR PUSH
+#define STATUS_TEXT_WFPU "-WFPU"
+#define AIRCRAFT_STATUS_PUSH 40 // PUSHING BACK
+#define STATUS_TEXT_PUSH "-PUSH"
+#define AIRCRAFT_STATUS_WFTX 30 // WATING FOR TAXI
+#define STATUS_TEXT_WFTX "-WFTX"
+#define AIRCRAFT_STATUS_TAXI 20 // TAXI TO RWY
+#define STATUS_TEXT_TAXI "-TAXI"
+#define AIRCRAFT_STATUS_WFTO 10 // WAITING FOR TAKE OFF
+#define STATUS_TEXT_WFTO "-WFTO"
+#define AIRCRAFT_STATUS_TOGA 0 // TAKE OFF
+#define STATUS_TEXT_TOGA "-TKOF"
+#endif // !AIRCRAFT_STATUS
+
+typedef struct SequenceNode {
+	EuroScopePlugIn::CFlightPlan fp;
+	int status, sequenceNumber;
+} SeqN;
+
+class UniSequence : public CPlugIn
 {
 public:
 	UniSequence();
 	~UniSequence();
 	future<string> bufferQueueString;
 	virtual bool OnCompileCommand(const char*);
+	virtual void OnFunctionCall(int, const char*, POINT, RECT);
 	virtual void OnGetTagItem(CFlightPlan, CRadarTarget, 
-		int, int, char[], int*, COLORREF*, double*);
+		int, int, char[16], int*, COLORREF*, double*);
 	void Messager(string);
-	virtual void OnTimer(int);
 	vector<string> airportList;
-	map<string, string> QueueCache;
+	vector<SeqN> sequence;
 private:
-	// fetch queue data from network to target address
-	void FetchQueue(string);
-	// Sync local sequence data
-	void SyncQueue(vector<string>);
-	void FetchQueueSocket();
-	int timerInterval = 10;
+	thread* dataSyncThread;
+	int timerInterval = 15;
+	SeqN* GetSeqN(CFlightPlan);
+	void PushToSeq(CFlightPlan);
+	void UpdateSeq(CFlightPlan, int);
+	void CheckApEnabled(string);
+	void SyncSeq(string, int);
+	void SyncSeqNum(string, int);
+	void PatchStatus(CFlightPlan, int);
 };
 

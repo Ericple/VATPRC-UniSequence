@@ -9,8 +9,8 @@
 
 // 添加要在此处预编译的标头
 #include "framework.h"
-#include <Windows.h>
 #include "httplib.h"
+#include <Windows.h>
 #include "EuroScopePlugIn.h"
 #include <iostream>
 #include <algorithm>
@@ -19,6 +19,7 @@
 #include <map>
 #include <list>
 #include <vector>
+#include <thread>
 
 #define SERVER_ADDRESS_PRC "64.44.185.202"
 #define SERVER_PORT_PRC 40480

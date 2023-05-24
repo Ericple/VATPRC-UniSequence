@@ -36,6 +36,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 {
 	RegisterTagItemType("Sequence", SEQUENCE_TAGITEM_TYPE_CODE);
 	RegisterTagItemFunction("Sequence Popup List", SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
+	RegisterTagItemFunction("Sequence Reorder", SEQUENCE_TAGITEM_FUNC_REORDER);
 	dataSyncThread = new thread([&] {
 		httplib::Client requestClient(SERVER_ADDRESS_PRC, SERVER_PORT_PRC);
 		requestClient.set_connection_timeout(5, 0);
@@ -180,8 +181,12 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
+	thread* reOrderThread;
 	switch (fId)
 	{
+	case SEQUENCE_TAGITEM_FUNC_REORDER:
+		OpenPopupEdit(area, SEQUENCE_TAGITEM_FUNC_REORDER_EDITED, "");
+		break;
 	case SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE:
 		OpenPopupList(area, "Status", 2);
 		AddPopupListElement("Waiting for clearance", "", FUNC_SWITCH_TO_WFCR);
@@ -192,6 +197,26 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		AddPopupListElement("Taxiing", "", FUNC_SWITCH_TO_TAXI);
 		AddPopupListElement("Waiting for take off", "", FUNC_SWITCH_TO_WFTO);
 		AddPopupListElement("Taking Off / Go Around", "", FUNC_SWITCH_TO_TOGA);
+		break;
+	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:
+		Messager("Performing sequence reorder...");
+		reOrderThread = new thread([sItemString, fp, this] {
+			httplib::Client req(SERVER_ADDRESS_PRC, SERVER_PORT_PRC);
+			string ap = fp.GetFlightPlanData().GetOrigin();
+			json reqBody = {
+				{"callsign", fp.GetCallsign()},
+				{"before", sItemString}
+			};
+			if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", reqBody.dump(), "application/json"))
+			{
+				Messager("Sequence order edited.");
+			}
+			else
+			{
+				Messager(httplib::to_string(res.error()));
+			}
+			});
+		Messager(sItemString);
 		break;
 	case FUNC_SWITCH_TO_WFCR:
 		PatchStatus(fp, AIRCRAFT_STATUS_WFCR);

@@ -38,6 +38,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 	RegisterTagItemFunction("Sequence Popup List", SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
 	RegisterTagItemFunction("Sequence Reorder", SEQUENCE_TAGITEM_FUNC_REORDER);
 	dataSyncThread = new thread([&] {
+		syncThreadFlag = true;
 		httplib::Client requestClient(SERVER_ADDRESS_PRC);
 		requestClient.set_connection_timeout(5, 0);
 		while (true)
@@ -63,7 +64,16 @@ UniSequence::UniSequence(void) : CPlugIn(
 			this_thread::sleep_for(chrono::seconds(timerInterval));
 		}
 		});
-	dataSyncThread->detach();
+	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
+	if (!logonCode)
+	{
+		Messager("You haven't set your logon code, please set your code first before using this plugin by enter \".sqc <your code here>\".");
+	}
+	else
+	{
+		dataSyncThread->detach();
+	}
+	if (syncThreadFlag) Messager("Data synchronize thread detached.");
 	Messager("UniSequence Plugin Loaded.");
 }
 
@@ -138,6 +148,26 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 		Messager(i);
 		return true;
 	}
+	if (cmd.substr(0, 4) == ".SQC")
+	{
+		try
+		{
+			stringstream ss(cmd);
+			char delim = ' ';
+			string item;
+			airportList.clear();
+			while (getline(ss, item, delim))
+			{
+				if (!item.empty() && item[0] != '.') SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, item.c_str()); // the command itself has been skiped here
+			}
+			Messager("Your logon code has been saved.");
+		}
+		catch (runtime_error const& e)
+		{
+			Messager("Error: " + *e.what());
+		}
+		return true;
+	}
 
 	return false;
 }
@@ -150,10 +180,16 @@ void UniSequence::PushToSeq(CFlightPlan fp)
 
 void UniSequence::PatchStatus(CFlightPlan fp, int status)
 {
+	if (!logonCode)
+	{
+		Messager(ERR_LOGON_CODE_NULLREF);
+		return;
+	}
 	thread patchThread([fp, status, this] {
 		json reqBody = {
-				{"callsign", fp.GetCallsign()},
-				{"status", status},
+			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
+			{JSON_KEY_STATUS, status},
+			{JSON_KEY_LOGON_CODE, logonCode}
 		};
 		httplib::Client patchReq(SERVER_ADDRESS_PRC);
 		patchReq.set_connection_timeout(3, 0);
@@ -175,7 +211,7 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 		}
 		else
 		{
-			Messager("Failed to connect to queue server.");
+			Messager(ERR_CONN_FAILED);
 		}
 		});
 	patchThread.detach();
@@ -207,24 +243,29 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		OpenPopupEdit(area, SEQUENCE_TAGITEM_FUNC_REORDER_EDITED, "");
 		break;
 	case SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE:
-		OpenPopupList(area, "Status", 2);
-		AddPopupListElement("Waiting for clearance", "", FUNC_SWITCH_TO_WFCR);
-		AddPopupListElement("Clearance granted", "", FUNC_SWITCH_TO_CLRD);
-		AddPopupListElement("Waiting for push", "", FUNC_SWITCH_TO_WFPU);
-		AddPopupListElement("Pushing", "", FUNC_SWITCH_TO_PUSH);
-		AddPopupListElement("Waiting for taxi", "", FUNC_SWITCH_TO_WFTX);
-		AddPopupListElement("Taxiing", "", FUNC_SWITCH_TO_TAXI);
-		AddPopupListElement("Waiting for take off", "", FUNC_SWITCH_TO_WFTO);
-		AddPopupListElement("Taking Off / Go Around", "", FUNC_SWITCH_TO_TOGA);
+		OpenPopupList(area, STATUS_LIST_TITLE, 2);
+		AddPopupListElement(STATUS_DESC_WFCR, "", FUNC_SWITCH_TO_WFCR);
+		AddPopupListElement(STATUS_DESC_CLRD, "", FUNC_SWITCH_TO_CLRD);
+		AddPopupListElement(STATUS_DESC_WFPU, "", FUNC_SWITCH_TO_WFPU);
+		AddPopupListElement(STATUS_DESC_PUSH, "", FUNC_SWITCH_TO_PUSH);
+		AddPopupListElement(STATUS_DESC_WFTX, "", FUNC_SWITCH_TO_WFTX);
+		AddPopupListElement(STATUS_DESC_TAXI, "", FUNC_SWITCH_TO_TAXI);
+		AddPopupListElement(STATUS_DESC_WFTO, "", FUNC_SWITCH_TO_WFTO);
+		AddPopupListElement(STATUS_DESC_TKOF, "", FUNC_SWITCH_TO_TOGA);
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:
-		Messager("Performing sequence reorder...");
+		if (!logonCode)
+		{
+			Messager(ERR_LOGON_CODE_NULLREF);
+			return;
+		}
 		reOrderThread = new thread([sItemString, fp, this] {
 			httplib::Client req(SERVER_ADDRESS_PRC);
 			string ap = fp.GetFlightPlanData().GetOrigin();
 			json reqBody = {
-				{"callsign", fp.GetCallsign()},
-				{"before", sItemString}
+				{JSON_KEY_CALLSIGN, fp.GetCallsign()},
+				{JSON_KEY_BEFORE, sItemString},
+				{JSON_KEY_LOGON_CODE, logonCode}
 			};
 			if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", reqBody.dump(), "application/json"))
 			{
@@ -298,6 +339,7 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	if (rt.GetGS() > 50)
 	{
 		RemoveFromSeq(fp);
+		return;
 	}
 	// automatically check if the departure airport of this fp is in the airport list
 	string depAirport = fp.GetFlightPlanData().GetOrigin();

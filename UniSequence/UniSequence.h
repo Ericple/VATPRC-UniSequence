@@ -33,29 +33,58 @@ using namespace EuroScopePlugIn;
 #endif // !LIMITATIONS
 
 #ifndef AIRCRAFT_STATUS
+#define STATUS_LIST_TITLE "Select Status"
 #define STATUS_TEXT_PLACE_HOLDER "________"
 #define AIRCRAFT_STATUS_NULL 999 // EMPTY STATUS
 #define STATUS_TEXT_NULL "-------"
 #define AIRCRAFT_STATUS_WFCR 70 // WAITING FOR CLEARANCE
 #define STATUS_TEXT_WFCR "-CLRD"
+#define STATUS_DESC_WFCR "Waiting for clearance"
 #define AIRCRAFT_STATUS_CLRD 60 // CLEARANCE GOT
 #define STATUS_TEXT_CLRD "+CLRD"
+#define STATUS_DESC_CLRD "Clearance granted"
 #define AIRCRAFT_STATUS_WFPU 50 // WATING FOR PUSH
 #define STATUS_TEXT_WFPU "-PUSH"
+#define STATUS_DESC_WFPU "Waiting for push"
 #define AIRCRAFT_STATUS_PUSH 40 // PUSHING BACK
 #define STATUS_TEXT_PUSH "+PUSH"
+#define STATUS_DESC_PUSH "Pushing back"
 #define AIRCRAFT_STATUS_WFTX 30 // WATING FOR TAXI
 #define STATUS_TEXT_WFTX "-TAXI"
+#define STATUS_DESC_WFTX "Waiting for taxi"
 #define AIRCRAFT_STATUS_TAXI 20 // TAXI TO RWY
 #define STATUS_TEXT_TAXI "+TAXI"
+#define STATUS_DESC_TAXI "Taxiing"
 #define AIRCRAFT_STATUS_WFTO 10 // WAITING FOR TAKE OFF
 #define STATUS_TEXT_WFTO "-TKOF"
+#define STATUS_DESC_WFTO "Waiting for take off"
 #define AIRCRAFT_STATUS_TOGA 0 // TAKE OFF
 #define STATUS_TEXT_TOGA "+TKOF"
+#define STATUS_DESC_TKOF "Taking off"
 #define STATUS_COLOR_WAIT RGB(255, 255, 0)
 #define STATUS_COLOR_IN_PROGRESS RGB(0, 204,0)
 #define STATUS_TEXT_FORMAT_STRING "%02d%s"
 #endif // !AIRCRAFT_STATUS
+
+#ifndef PLUGIN_SETTING_KEYS
+#define PLUGIN_SETTING_KEY_LOGON_CODE "logonstr"
+#define PLUGIN_SETTING_DESC_LOGON_CODE "Your logon code for unisequence plugin to establish connection with vatprc server."
+#endif // !PLUGIN_SETTING_KEYS
+
+#ifndef MESSAGE
+#define ERR_LOGON_CODE_NULLREF "You haven't set your logon code, operation aborted."
+#define ERR_CONN_FAILED "Failed to connect to queue server."
+#endif // !MESSAGE
+
+#ifndef REQUEST_RELATED
+#define JSON_KEY_LOGON_CODE "code"
+#define JSON_KEY_CALLSIGN "callsign"
+#define JSON_KEY_STATUS "status"
+#define JSON_KEY_BEFORE "before"
+#endif // !REQUEST_RELATED
+
+
+
 
 typedef struct SequenceNode {
 	EuroScopePlugIn::CFlightPlan fp;
@@ -77,7 +106,9 @@ public:
 	vector<SeqN> sequence;
 private:
 	thread* dataSyncThread;
-	int timerInterval = 7;
+	bool syncThreadFlag = false;
+	const char* logonCode;
+	int timerInterval = 6;
 	SeqN* GetSeqN(CFlightPlan);
 	void PushToSeq(CFlightPlan);
 	void RemoveFromSeq(CFlightPlan);

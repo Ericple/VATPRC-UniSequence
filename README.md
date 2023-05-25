@@ -50,14 +50,14 @@ Add an item like shown in the image below
 
 ## Change the status of crew
 
-If you have correctly configured the plugin according to the above guidelines, you can select from the list the state you want to assign to the unit by left-clicking in the SEQ/STS field.
+If you have correctly configured the plugin according to the guidelines above, you can select the state from the list you want to assign to the crew by left-clicking in the SEQ/STS field.
 
 ![image](https://github.com/Ericple/VATPRC-UniSequence/assets/13230558/3932fa8a-de12-4325-bcd9-db7e8035a7e4)
 
 ## Reorder the crews
 
-Right-clicking in the SEQ/STS field will allow a string value to be entered. This value allows <callsign> / -1.
-Entering a callsign will move the order of the group you are currently operating to the front of the group corresponding to the callsign you entered. If you type "-1", then this action will move the unit to the top of the unit of the same state.
+Right-clicking in the SEQ/STS field will allow a string value to be entered. This value allows callsign / -1.
+Entering a callsign will move the order of the group you are currently operating to the front of the group corresponding to the callsign you entered. If you type "-1", then this action will move the crew to the top of the crew of the same state.
 
 ![image](https://github.com/Ericple/VATPRC-UniSequence/assets/13230558/6ac55af7-2b0c-4bfa-83ce-24031af758cc)
 

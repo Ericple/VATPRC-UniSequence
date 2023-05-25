@@ -9,9 +9,9 @@
 
 // 添加要在此处预编译的标头
 #include "framework.h"
-#include "httplib.h"
+#include "include/httplib.h"
 #include <Windows.h>
-#include "EuroScopePlugIn.h"
+#include "include/EuroScopePlugIn.h"
 #include <iostream>
 #include <algorithm>
 #include "json.hpp"

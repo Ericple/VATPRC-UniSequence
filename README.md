@@ -61,6 +61,6 @@ Entering a callsign will move the order of the group you are currently operating
 
 ![image](https://github.com/Ericple/VATPRC-UniSequence/assets/13230558/6ac55af7-2b0c-4bfa-83ce-24031af758cc)
 
-This action will move the sort (06) of CES6938 to the front of CSH9106. After successful operation, the SEQ/STS column of CSH9106 will become "06+PUSH" and CES6938 will become "05+PUSH".👇👇👇
+This action will move the sort (06) of CES6938 to the front of CSH9106. After successfully operated, the SEQ/STS column of CSH9106 will become "06+PUSH" and CES6938 will become "05+PUSH".👇👇👇
 
 ![F2QF1)HCEVX8W~L@GQVS$~B](https://github.com/Ericple/VATPRC-UniSequence/assets/13230558/5777cbad-200b-4e69-ab53-a0242ff3c51e)

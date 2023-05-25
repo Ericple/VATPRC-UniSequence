@@ -77,7 +77,7 @@ public:
 	vector<SeqN> sequence;
 private:
 	thread* dataSyncThread;
-	int timerInterval = 15;
+	int timerInterval = 7;
 	SeqN* GetSeqN(CFlightPlan);
 	void PushToSeq(CFlightPlan);
 	void RemoveFromSeq(CFlightPlan);

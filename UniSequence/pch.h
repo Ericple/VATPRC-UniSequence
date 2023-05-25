@@ -14,7 +14,7 @@
 #include "include/EuroScopePlugIn.h"
 #include <iostream>
 #include <algorithm>
-#include "json.hpp"
+#include "include/json.hpp"
 #include <future>
 #include <map>
 #include <list>

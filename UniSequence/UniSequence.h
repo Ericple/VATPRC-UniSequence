@@ -8,9 +8,9 @@ using namespace EuroScopePlugIn;
 #define GITHUB_LINK "Closed source for now"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "1.0.0"
+#define PLUGIN_VER "0.6.0-beta"
 #define PLUGIN_AUTHOR "Ericple Garrison"
-#define PLUGIN_COPYRIGHT "GPL v3"
+#define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif
 
 #ifndef Code
@@ -37,21 +37,24 @@ using namespace EuroScopePlugIn;
 #define AIRCRAFT_STATUS_NULL 999 // EMPTY STATUS
 #define STATUS_TEXT_NULL "-------"
 #define AIRCRAFT_STATUS_WFCR 70 // WAITING FOR CLEARANCE
-#define STATUS_TEXT_WFCR "-WFCR"
+#define STATUS_TEXT_WFCR "-CLRD"
 #define AIRCRAFT_STATUS_CLRD 60 // CLEARANCE GOT
-#define STATUS_TEXT_CLRD "-CLRD"
+#define STATUS_TEXT_CLRD "+CLRD"
 #define AIRCRAFT_STATUS_WFPU 50 // WATING FOR PUSH
-#define STATUS_TEXT_WFPU "-WFPU"
+#define STATUS_TEXT_WFPU "-PUSH"
 #define AIRCRAFT_STATUS_PUSH 40 // PUSHING BACK
-#define STATUS_TEXT_PUSH "-PUSH"
+#define STATUS_TEXT_PUSH "+PUSH"
 #define AIRCRAFT_STATUS_WFTX 30 // WATING FOR TAXI
-#define STATUS_TEXT_WFTX "-WFTX"
+#define STATUS_TEXT_WFTX "-TAXI"
 #define AIRCRAFT_STATUS_TAXI 20 // TAXI TO RWY
-#define STATUS_TEXT_TAXI "-TAXI"
+#define STATUS_TEXT_TAXI "+TAXI"
 #define AIRCRAFT_STATUS_WFTO 10 // WAITING FOR TAKE OFF
-#define STATUS_TEXT_WFTO "-WFTO"
+#define STATUS_TEXT_WFTO "-TKOF"
 #define AIRCRAFT_STATUS_TOGA 0 // TAKE OFF
-#define STATUS_TEXT_TOGA "-TKOF"
+#define STATUS_TEXT_TOGA "+TKOF"
+#define STATUS_COLOR_WAIT RGB(255, 255, 0)
+#define STATUS_COLOR_IN_PROGRESS RGB(0, 204,0)
+#define STATUS_TEXT_FORMAT_STRING "%02d%s"
 #endif // !AIRCRAFT_STATUS
 
 typedef struct SequenceNode {
@@ -77,7 +80,7 @@ private:
 	int timerInterval = 15;
 	SeqN* GetSeqN(CFlightPlan);
 	void PushToSeq(CFlightPlan);
-	void UpdateSeq(CFlightPlan, int);
+	void RemoveFromSeq(CFlightPlan);
 	void CheckApEnabled(string);
 	void SyncSeq(string, int);
 	void SyncSeqNum(string, int);

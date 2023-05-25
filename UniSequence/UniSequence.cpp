@@ -181,6 +181,20 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 	patchThread.detach();
 }
 
+void UniSequence::RemoveFromSeq(CFlightPlan fp)
+{
+	int offset = 0;
+	for (auto& ac : sequence)
+	{
+		if (ac.fp.GetCallsign() == fp.GetCallsign())
+		{
+			sequence.erase(sequence.begin() + offset);
+			return;
+		}
+		offset++;
+	}
+}
+
 void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area)
 {
 	CFlightPlan fp;
@@ -280,6 +294,11 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	if (!fp.IsValid() || !rt.IsValid()) return;
 	// check if item code is what we need to handle
 	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;
+	// remove aircraft if it's taking off
+	if (rt.GetGS() > 50)
+	{
+		RemoveFromSeq(fp);
+	}
 	// automatically check if the departure airport of this fp is in the airport list
 	string depAirport = fp.GetFlightPlanData().GetOrigin();
 	CheckApEnabled(depAirport);
@@ -288,6 +307,8 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	SeqN* ac = GetSeqN(fp);
 	int status = ac->status; // recapture the fp we just added
 	int seqNum = ac->sequenceNumber;
+	// you won't want to say "Your sequence number is one hundred and fivty nine" :D
+	if (ac->sequenceNumber > 99) seqNum = 99;
 	int bufferSize = strlen(STATUS_TEXT_PLACE_HOLDER) + 1;
 	switch (status)
 	{
@@ -295,28 +316,44 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 		sprintf_s(sItemString, bufferSize, "%s", STATUS_TEXT_NULL);
 		break;
 	case AIRCRAFT_STATUS_WFCR:
-		sprintf_s(sItemString, bufferSize, "%02d%s", seqNum, STATUS_TEXT_WFCR);
+		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_WFCR);
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = STATUS_COLOR_WAIT;
 		break;
 	case AIRCRAFT_STATUS_CLRD:
-		sprintf_s(sItemString, bufferSize, "%02d%s", seqNum, STATUS_TEXT_CLRD);
+		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_CLRD);
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = STATUS_COLOR_IN_PROGRESS;
 		break;
 	case AIRCRAFT_STATUS_WFPU:
-		sprintf_s(sItemString, bufferSize, "%02d%s", seqNum, STATUS_TEXT_WFPU);
+		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_WFPU);
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = STATUS_COLOR_WAIT;
 		break;
 	case AIRCRAFT_STATUS_PUSH:
-		sprintf_s(sItemString, bufferSize, "%02d%s", seqNum, STATUS_TEXT_PUSH);
+		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_PUSH);
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = STATUS_COLOR_IN_PROGRESS;
 		break;
 	case AIRCRAFT_STATUS_WFTX:
-		sprintf_s(sItemString, bufferSize, "%02d%s", seqNum, STATUS_TEXT_WFTX);
+		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_WFTX);
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = STATUS_COLOR_WAIT;
 		break;
 	case AIRCRAFT_STATUS_TAXI:
-		sprintf_s(sItemString, bufferSize, "%02d%s", seqNum, STATUS_TEXT_TAXI);
+		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_TAXI);
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = STATUS_COLOR_IN_PROGRESS;
 		break;
 	case AIRCRAFT_STATUS_WFTO:
-		sprintf_s(sItemString, bufferSize, "%02d%s", seqNum, STATUS_TEXT_WFTO);
+		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_WFTO);
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = STATUS_COLOR_WAIT;
 		break;
 	case AIRCRAFT_STATUS_TOGA:
-		sprintf_s(sItemString, bufferSize, "%02d%s", seqNum, STATUS_TEXT_TOGA);
+		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_TOGA);
+		*pColorCode = TAG_COLOR_RGB_DEFINED;
+		*pRGB = STATUS_COLOR_IN_PROGRESS;
 		break;
 	}
 	return;

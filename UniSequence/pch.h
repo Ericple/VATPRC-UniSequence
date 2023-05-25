@@ -21,8 +21,7 @@
 #include <vector>
 #include <thread>
 
-#define SERVER_ADDRESS_PRC "64.44.185.202"
-#define SERVER_PORT_PRC 40480
+#define SERVER_ADDRESS_PRC "http://q.vatprc.net"
 #define SERVER_RESTFUL_VER "/v1/"
 
 #endif //PCH_H

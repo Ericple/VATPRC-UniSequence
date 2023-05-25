@@ -38,7 +38,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 	RegisterTagItemFunction("Sequence Popup List", SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
 	RegisterTagItemFunction("Sequence Reorder", SEQUENCE_TAGITEM_FUNC_REORDER);
 	dataSyncThread = new thread([&] {
-		httplib::Client requestClient(SERVER_ADDRESS_PRC, SERVER_PORT_PRC);
+		httplib::Client requestClient(SERVER_ADDRESS_PRC);
 		requestClient.set_connection_timeout(5, 0);
 		while (true)
 		{
@@ -155,7 +155,7 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 				{"callsign", fp.GetCallsign()},
 				{"status", status},
 		};
-		httplib::Client patchReq(SERVER_ADDRESS_PRC, SERVER_PORT_PRC);
+		httplib::Client patchReq(SERVER_ADDRESS_PRC);
 		patchReq.set_connection_timeout(3, 0);
 		string ap = fp.GetFlightPlanData().GetOrigin();
 		if (auto result = patchReq.Patch(SERVER_RESTFUL_VER + ap + "/status", reqBody.dump().c_str(), "application/json"))
@@ -220,7 +220,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:
 		Messager("Performing sequence reorder...");
 		reOrderThread = new thread([sItemString, fp, this] {
-			httplib::Client req(SERVER_ADDRESS_PRC, SERVER_PORT_PRC);
+			httplib::Client req(SERVER_ADDRESS_PRC);
 			string ap = fp.GetFlightPlanData().GetOrigin();
 			json reqBody = {
 				{"callsign", fp.GetCallsign()},

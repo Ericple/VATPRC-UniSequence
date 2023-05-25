@@ -30,9 +30,6 @@
     <ClInclude Include="UniSequence.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="SequenceWorks.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="lib\include\curl\curl.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -75,9 +72,6 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="UniSequence.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="SequenceWorks.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

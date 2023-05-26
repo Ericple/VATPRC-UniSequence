@@ -13,7 +13,7 @@ using namespace EuroScopePlugIn;
 #define GITHUB_LINK "https://github.com/Ericple/VATPRC-UniSequence"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "0.2.0-beta"
+#define PLUGIN_VER "0.3.1-beta"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif

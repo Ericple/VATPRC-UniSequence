@@ -1,5 +1,10 @@
 #pragma once
 
+// comment this when compiling for release
+#define ENV_DEBUG
+// uncomment this when in official release
+// #define PATCH_WITH_LOGON_CODE
+
 using namespace std;
 using namespace EuroScopePlugIn;
 
@@ -72,8 +77,9 @@ using namespace EuroScopePlugIn;
 #endif // !PLUGIN_SETTING_KEYS
 
 #ifndef MESSAGE
-#define ERR_LOGON_CODE_NULLREF "You haven't set your logon code, operation aborted."
+#define ERR_LOGON_CODE_NULLREF "You haven't set your logon code, please set your code first before using this plugin by enter \".sqc <your code here>\"."
 #define ERR_CONN_FAILED "Failed to connect to queue server."
+#define MSG_LOGON_CODE_SAVED "Your logon code has been saved."
 #endif // !MESSAGE
 
 #ifndef REQUEST_RELATED
@@ -83,6 +89,9 @@ using namespace EuroScopePlugIn;
 #define JSON_KEY_BEFORE "before"
 #endif // !REQUEST_RELATED
 
+#ifndef LOGGER_RELATED
+#define LOG_FILE_NAME "unilog.log"
+#endif // !LOGGER_RELATED
 
 
 
@@ -104,6 +113,7 @@ public:
 	void Messager(string);
 	vector<string> airportList;
 	vector<SeqN> sequence;
+	void endLog();
 private:
 	thread* dataSyncThread;
 	bool syncThreadFlag = false;
@@ -116,5 +126,8 @@ private:
 	void SyncSeq(string, int);
 	void SyncSeqNum(string, int);
 	void PatchStatus(CFlightPlan, int);
+	// log related
+	ofstream logStream;
+	void log(string);
 };
 

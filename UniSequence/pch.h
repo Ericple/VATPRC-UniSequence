@@ -13,6 +13,8 @@
 #include <Windows.h>
 #include "include/EuroScopePlugIn.h"
 #include <iostream>
+#include <fstream>
+#include <time.h>
 #include <algorithm>
 #include "include/json.hpp"
 #include <future>

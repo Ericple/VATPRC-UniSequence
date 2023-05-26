@@ -14,5 +14,6 @@ EuroScopePlugInInit(CPlugIn** ppPluginInstance)
 void __declspec (dllexport)
 EuroScopePlugInExit(void)
 {
+	pMyPlugIn->endLog();
 	delete pMyPlugIn;
 }

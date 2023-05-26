@@ -87,6 +87,7 @@ using namespace EuroScopePlugIn;
 #define JSON_KEY_CALLSIGN "callsign"
 #define JSON_KEY_STATUS "status"
 #define JSON_KEY_BEFORE "before"
+#define DEFAULT_LOGON_CODE "testlogon"
 #endif // !REQUEST_RELATED
 
 #ifndef LOGGER_RELATED
@@ -117,7 +118,7 @@ public:
 private:
 	thread* dataSyncThread;
 	bool syncThreadFlag = false;
-	const char* logonCode;
+	const char* logonCode = DEFAULT_LOGON_CODE;
 	int timerInterval = 6;
 	SeqN* GetSeqN(CFlightPlan);
 	void PushToSeq(CFlightPlan);

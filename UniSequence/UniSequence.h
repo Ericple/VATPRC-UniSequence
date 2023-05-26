@@ -11,9 +11,12 @@ using namespace EuroScopePlugIn;
 #ifndef COPYRIGHTS
 #define AUTHOR "Ericple Garrison"
 #define GITHUB_LINK "https://github.com/Ericple/VATPRC-UniSequence"
+#define GITHUB_UPDATE "https://api.github.com"
+#define SERVER_ADDRESS_PRC "https://q.vatprc.net"
+#define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "0.3.1-beta"
+#define PLUGIN_VER "v0.3.1-beta"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif
@@ -117,6 +120,7 @@ public:
 	void endLog();
 private:
 	thread* dataSyncThread;
+	thread* updateCheckThread;
 	bool syncThreadFlag = false;
 	const char* logonCode = DEFAULT_LOGON_CODE;
 	int timerInterval = 6;

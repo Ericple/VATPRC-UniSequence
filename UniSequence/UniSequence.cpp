@@ -94,6 +94,37 @@ UniSequence::UniSequence(void) : CPlugIn(
 			this_thread::sleep_for(chrono::seconds(timerInterval));
 		}
 		});
+	updateCheckThread = new thread([&] {
+		httplib::Client updateReq(GITHUB_UPDATE);
+		updateReq.set_connection_timeout(10, 0);
+		log("Update thread detached.");
+		while (true)
+		{
+			log("Checking updates...");
+			if (auto result = updateReq.Get("/repos/Ericple/VATPRC-UniSequence/releases"))
+			{
+				json versionInfo = json::parse(result->body);
+				string versionTag = versionInfo[0]["tag_name"];
+				string versionName = versionInfo[0]["name"];
+				string publishDate = versionInfo[0]["created_at"];
+				if (versionTag != PLUGIN_VER)
+				{
+					Messager("Notification: Update is available! The latest version is: " + versionName + " " + versionTag + " Publish date: " + publishDate);
+				}
+				else
+				{
+					Messager("Your plugin is up to date.");
+				}
+			}
+			else
+			{
+				
+				Messager("Error occured while checking updates - "+httplib::to_string(result.error()));
+			}
+			this_thread::sleep_for(chrono::minutes(5));
+		}
+		});
+	updateCheckThread->detach();
 #ifdef PATCH_WITH_LOGON_CODE
 	log("Reading settings from EuroScope.");
 	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);

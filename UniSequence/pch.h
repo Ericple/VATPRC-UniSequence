@@ -7,6 +7,8 @@
 #ifndef PCH_H
 #define PCH_H
 
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+
 // 添加要在此处预编译的标头
 #include "framework.h"
 #include "include/httplib.h"
@@ -22,8 +24,5 @@
 #include <list>
 #include <vector>
 #include <thread>
-
-#define SERVER_ADDRESS_PRC "http://q.vatprc.net"
-#define SERVER_RESTFUL_VER "/v1/"
 
 #endif //PCH_H

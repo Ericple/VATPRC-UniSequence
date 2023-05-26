@@ -12,6 +12,7 @@ using namespace EuroScopePlugIn;
 #define AUTHOR "Ericple Garrison"
 #define GITHUB_LINK "https://github.com/Ericple/VATPRC-UniSequence"
 #define GITHUB_UPDATE "https://api.github.com"
+#define GITHUB_UPDATE_PATH "/repos/Ericple/VATPRC-UniSequence/releases"
 #define SERVER_ADDRESS_PRC "https://q.vatprc.net"
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"

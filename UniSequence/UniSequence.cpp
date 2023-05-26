@@ -101,7 +101,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 		while (true)
 		{
 			log("Checking updates...");
-			if (auto result = updateReq.Get("/repos/Ericple/VATPRC-UniSequence/releases"))
+			if (auto result = updateReq.Get(GITHUB_UPDATE_PATH))
 			{
 				json versionInfo = json::parse(result->body);
 				string versionTag = versionInfo[0]["tag_name"];

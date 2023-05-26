@@ -81,11 +81,9 @@ UniSequence::UniSequence(void) : CPlugIn(
 					int seqNumber = 1;
 					for (auto& seqObj : resObj["data"])
 					{
-						log("Updating data");
 						SyncSeq(seqObj["callsign"], seqObj["status"]);
 						SyncSeqNum(seqObj["callsign"], seqNumber);
 						seqNumber++;
-						log("Updated.");
 					}
 				}
 				else

@@ -1,9 +1,9 @@
 #pragma once
 
-// comment this when compiling for release
-#define ENV_DEBUG
+ //#define RELEASE
 // uncomment this when in official release
 // #define PATCH_WITH_LOGON_CODE
+//#define USE_WEBSOCKET
 
 using namespace std;
 using namespace EuroScopePlugIn;
@@ -14,6 +14,7 @@ using namespace EuroScopePlugIn;
 #define GITHUB_UPDATE "https://api.github.com"
 #define GITHUB_UPDATE_PATH "/repos/Ericple/VATPRC-UniSequence/releases"
 #define SERVER_ADDRESS_PRC "https://q.vatprc.net"
+#define SERVER_ADDRESS_WITH_PORT "https://q.vatprc.net:443"
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
@@ -98,12 +99,15 @@ using namespace EuroScopePlugIn;
 #define LOG_FILE_NAME "unilog.log"
 #endif // !LOGGER_RELATED
 
-
-
 typedef struct SequenceNode {
 	EuroScopePlugIn::CFlightPlan fp;
 	int status, sequenceNumber;
 } SeqN;
+
+struct AirportSocket {
+	string icao;
+	thread* socketThread;
+};
 
 class UniSequence : public CPlugIn
 {
@@ -117,11 +121,16 @@ public:
 		int, int, char[16], int*, COLORREF*, double*);
 	void Messager(string);
 	vector<string> airportList;
+	vector<AirportSocket> socketList;
 	vector<SeqN> sequence;
+	// log related
 	void endLog();
+	ofstream logStream;
+	void log(string);
 private:
 	thread* dataSyncThread;
 	thread* updateCheckThread;
+	thread* wsSyncThread;
 	bool syncThreadFlag = false;
 	const char* logonCode = DEFAULT_LOGON_CODE;
 	int timerInterval = 6;
@@ -132,8 +141,6 @@ private:
 	void SyncSeq(string, int);
 	void SyncSeqNum(string, int);
 	void PatchStatus(CFlightPlan, int);
-	// log related
-	ofstream logStream;
-	void log(string);
+	bool seqOpLock = false;
 };
 

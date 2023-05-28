@@ -63,6 +63,15 @@
     <ClInclude Include="queueItem.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="CWsClient.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="connection_metadata.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="websocket_endpoint.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -72,6 +81,15 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="UniSequence.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="CWsClient.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="connection_metadata.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="websocket_endpoint.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

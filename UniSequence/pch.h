@@ -16,6 +16,7 @@
 #include "websocketpp/client.hpp"
 #include "websocketpp/common/thread.hpp"
 #include "websocketpp/common/memory.hpp"
+#include <mutex>
 #include <locale>
 #include <codecvt>
 #include <cstdlib>

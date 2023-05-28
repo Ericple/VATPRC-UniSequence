@@ -46,7 +46,7 @@ using namespace EuroScopePlugIn;
 #define STATUS_LIST_TITLE "Select Status"
 #define STATUS_TEXT_PLACE_HOLDER "________"
 #define AIRCRAFT_STATUS_NULL 999 // EMPTY STATUS
-#define STATUS_TEXT_NULL "-------"
+#define STATUS_TEXT_NULL "ZZ-----"
 #define AIRCRAFT_STATUS_WFCR 70 // WAITING FOR CLEARANCE
 #define STATUS_TEXT_WFCR "-CLRD"
 #define STATUS_DESC_WFCR "Waiting for clearance"
@@ -102,6 +102,7 @@ using namespace EuroScopePlugIn;
 typedef struct SequenceNode {
 	EuroScopePlugIn::CFlightPlan fp;
 	int status, sequenceNumber;
+	bool seqNumUpdated;
 } SeqN;
 
 struct AirportSocket {
@@ -128,18 +129,21 @@ public:
 	ofstream logStream;
 	void log(string);
 private:
+	mutex sequenceLock;
 	thread* dataSyncThread;
 	thread* updateCheckThread;
 	thread* wsSyncThread;
 	bool syncThreadFlag = false;
 	const char* logonCode = DEFAULT_LOGON_CODE;
-	int timerInterval = 6;
+	int timerInterval = 5;
 	SeqN* GetSeqN(CFlightPlan);
 	void PushToSeq(CFlightPlan);
 	void RemoveFromSeq(CFlightPlan);
+	void RemoveFromSeq(string);
 	void CheckApEnabled(string);
 	void SyncSeq(string, int);
 	void SyncSeqNum(string, int);
+	void ClearUpdateFlag();
 	void PatchStatus(CFlightPlan, int);
 	bool seqOpLock = false;
 };

@@ -136,6 +136,8 @@
       <EnableUAC>false</EnableUAC>
       <AdditionalDependencies>.\lib\EuroScopePlugInDll.lib;.\lib\libssl.lib;.\lib\libcrypto.lib;.\lib\libboost_random-vc143-mt-gd-x32-1_82.lib</AdditionalDependencies>
       <AssemblyDebug>false</AssemblyDebug>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

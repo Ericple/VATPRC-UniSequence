@@ -23,8 +23,7 @@ void UniSequence::endLog()
 
 void UniSequence::SyncSeq(string callsign, int status)
 {
-	while (seqOpLock) {}
-	seqOpLock = true;
+	lock_guard<mutex> guard(sequenceLock);
 	log("Synchronizing sequence status for " + callsign);
 	for (auto& seqN : sequence)
 	{
@@ -35,18 +34,24 @@ void UniSequence::SyncSeq(string callsign, int status)
 #endif // ENV_DEBUG
 			seqN.status = status;
 			log("Sync complete.");
-			seqOpLock = false;
 			return;
 		}
 	}
-	seqOpLock = false;
 	return;
+}
+
+// This function is not allowed to be called in non threads, otherwise it may cause access conflicts
+void UniSequence::ClearUpdateFlag()
+{
+	for (auto& ac : sequence)
+	{
+		if (ac.seqNumUpdated) ac.seqNumUpdated = false;
+	}
 }
 
 void UniSequence::SyncSeqNum(string callsign, int seqNum)
 {
-	while (seqOpLock) {}
-	seqOpLock = true;
+	lock_guard<mutex> guard(sequenceLock);
 	log("Synchronizing sequence number for " + callsign);
 	for (auto& seqN : sequence)
 	{
@@ -57,12 +62,28 @@ void UniSequence::SyncSeqNum(string callsign, int seqNum)
 #endif // RELEASE
 			seqN.sequenceNumber = seqNum;
 			log("Sync complete.");
-			seqOpLock = false;
+			seqN.seqNumUpdated = true;
+			
 			return;
 		}
 	}
-	seqOpLock = false;
+	
 	return;
+}
+
+void UniSequence::RemoveFromSeq(string callsign)
+{
+	lock_guard<mutex> guard(sequenceLock);
+	int offset = 0;
+	for (auto& seqN : sequence)
+	{
+		if (seqN.fp.GetCallsign() == callsign)
+		{
+			sequence.erase(sequence.begin() + offset);
+			return;
+		}
+		offset++;
+	}
 }
 
 UniSequence::UniSequence(void) : CPlugIn(
@@ -70,9 +91,11 @@ UniSequence::UniSequence(void) : CPlugIn(
 	PLUGIN_NAME, PLUGIN_VER, PLUGIN_AUTHOR, PLUGIN_COPYRIGHT
 )
 {
+	// Clear local log
 	if (!remove(LOG_FILE_NAME)) Messager("log file not found.");
 	log("UniSequence initializing");
 	log("Attempting to register tag item type of \"Sequence\"");
+	// Registering a Tag Object for EuroScope
 	RegisterTagItemType("Sequence", SEQUENCE_TAGITEM_TYPE_CODE);
 	RegisterTagItemFunction("Sequence Popup List", SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
 	RegisterTagItemFunction("Sequence Reorder", SEQUENCE_TAGITEM_FUNC_REORDER);
@@ -125,63 +148,58 @@ UniSequence::UniSequence(void) : CPlugIn(
 		requestClient.set_connection_timeout(5, 0);
 		while (true)
 		{
-			for (auto& airport : airportList)
+			try
 			{
-				log("Sync data of " + airport);
-				if (auto result = requestClient.Get(SERVER_RESTFUL_VER + airport + "/queue"))
-				{
-					log("Data fetched, updating local sequence list");
-					json resObj = json::parse(result->body);
-					int seqNumber = 1;
-					for (auto& seqN : sequence)
-					{
-						SyncSeqNum(seqN.fp.GetCallsign(), 99);
-					}
-					for (auto& seqObj : resObj["data"])
-					{
-						SyncSeq(seqObj["callsign"], seqObj["status"]);
-						SyncSeqNum(seqObj["callsign"], seqNumber);
-						seqNumber++;
-					}
-				}
-				else
-				{
-					Messager(httplib::to_string(result.error()));
-				}
-			}
-			this_thread::sleep_for(chrono::seconds(timerInterval));
-		}
-});
 #ifdef PATCH_WITH_LOGON_CODE
-	log("Reading settings from EuroScope.");
-	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-	if (!logonCode)
-	{
-		log("Logon code not set.");
-		Messager(ERR_LOGON_CODE_NULLREF);
-		syncThreadFlag = false;
-	}
-	else
-	{
-		log("Start synchronizing sequence data with server.");
-		dataSyncThread->detach();
-		syncThreadFlag = true;
-	}
-	if (syncThreadFlag) Messager("Data synchronize thread detached.");
-#else
-	log("Start synchronizing sequence data with server.");
-	dataSyncThread->detach();
+				logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
+				if (!logonCode) return;
 #endif // PATCH_WITH_LOGON_CODE
+				for (auto& airport : airportList)
+				{
+					log("Sync data of " + airport);
+					if (auto result = requestClient.Get(SERVER_RESTFUL_VER + airport + "/queue"))
+					{
+						log("Data fetched, updating local sequence list");
+						json resObj = json::parse(result->body);
+						int seqNumber = 1;
+						for (auto& seqObj : resObj["data"])
+						{
+							SyncSeq(seqObj["callsign"], seqObj["status"]);
+							SyncSeqNum(seqObj["callsign"], seqNumber);
+							seqNumber++;
+						}
+						// If the unit does not exist remotely, remove it from the local list
+						for (auto& seqN : sequence)
+						{
+							if (!seqN.seqNumUpdated) RemoveFromSeq(seqN.fp.GetCallsign());
+						}
+						ClearUpdateFlag();
+					}
+					else
+					{
+						Messager(httplib::to_string(result.error()));
+					}
+				}
+				this_thread::sleep_for(chrono::seconds(timerInterval));
+			}
+			catch (const std::exception& e)
+			{
+				Messager(e.what());
+			}
+		}
+	});
+	Messager("Start synchronizing sequence data with server.");
+	// detached anyway
+	dataSyncThread->detach();
 #endif // USE_WEBSOCKET
-
-	
+	// update check thread has been detached, so it's safe
 	updateCheckThread = new thread([&] {
 		httplib::Client updateReq(GITHUB_UPDATE);
 		updateReq.set_connection_timeout(10, 0);
-		log("Update thread detached.");
+		Messager("Start updates check routine.");
 		while (true)
 		{
-			log("Checking updates...");
+			Messager("Checking updates...");
 			if (auto result = updateReq.Get(GITHUB_UPDATE_PATH))
 			{
 				json versionInfo = json::parse(result->body);
@@ -207,8 +225,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 		});
 	updateCheckThread->detach();
 
-	Messager("UniSequence Plugin Loaded.");
-	log("Initialization complete.");
+	Messager("Initialization complete.");
 }
 
 UniSequence::~UniSequence(void){}
@@ -331,14 +348,13 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 
 void UniSequence::PushToSeq(CFlightPlan fp)
 {
-	while (seqOpLock) {}
-	seqOpLock = true;
+	lock_guard<mutex> guard(sequenceLock);
 	string cs = fp.GetCallsign();
 	log("Initializing an new pointer for Sequence Node instance for " + cs);
-	SeqN seqN = *new SeqN{ fp, AIRCRAFT_STATUS_NULL };
+	SeqN seqN = *new SeqN{ fp, AIRCRAFT_STATUS_NULL, false };
 	log("Pushing an new instance to local sequence vector.");
 	sequence.push_back(seqN);
-	seqOpLock = false;
+	
 	return;
 }
 
@@ -360,7 +376,7 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 			{JSON_KEY_LOGON_CODE, logonCode}
 		};
 		httplib::Client patchReq(SERVER_ADDRESS_PRC);
-		patchReq.set_connection_timeout(3, 0);
+		patchReq.set_connection_timeout(10, 0);
 		string ap = fp.GetFlightPlanData().GetOrigin();
 		if (auto result = patchReq.Patch(SERVER_RESTFUL_VER + ap + "/status", reqBody.dump().c_str(), "application/json"))
 		{
@@ -387,8 +403,7 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 
 void UniSequence::RemoveFromSeq(CFlightPlan fp)
 {
-	while (seqOpLock) {}
-	seqOpLock = true;
+	lock_guard<mutex> guard(sequenceLock);
 	log("Removing from local sequence");
 	int offset = 0;
 	for (auto& ac : sequence)
@@ -400,13 +415,12 @@ void UniSequence::RemoveFromSeq(CFlightPlan fp)
 			log("Removing");
 			sequence.erase(sequence.begin() + offset);
 			log("removed");
-			seqOpLock = false;
 			return;
 		}
 		offset++;
 	}
 	log("not in local sequence, nothing happend.");
-	seqOpLock = false;
+	
 	return;
 }
 
@@ -447,6 +461,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		log("Creating an new thread for reorder request");
 		reOrderThread = new thread([sItemString, fp, this] {
 			httplib::Client req(SERVER_ADDRESS_PRC);
+			req.set_connection_timeout(10, 0);
 			string ap = fp.GetFlightPlanData().GetOrigin();
 			json reqBody = {
 				{JSON_KEY_CALLSIGN, fp.GetCallsign()},
@@ -465,6 +480,12 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 						SyncSeqNum(seqObj["callsign"], seqNumber);
 						seqNumber++;
 					}
+					// If the unit does not exist remotely, remove it from the local list
+					for (auto& seqN : sequence)
+					{
+						if (!seqN.seqNumUpdated) RemoveFromSeq(seqN.fp.GetCallsign());
+					}
+					ClearUpdateFlag();
 				}
 			}
 			else

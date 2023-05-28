@@ -12,10 +12,10 @@
 // 添加要在此处预编译的标头
 #include "framework.h"
 #include <iostream>
-#include <websocketpp/config/asio_no_tls_client.hpp>
-#include <websocketpp/client.hpp>
-#include <websocketpp/common/thread.hpp>
-#include <websocketpp/common/memory.hpp>
+#include "websocketpp/config/asio_no_tls_client.hpp"
+#include "websocketpp/client.hpp"
+#include "websocketpp/common/thread.hpp"
+#include "websocketpp/common/memory.hpp"
 #include <locale>
 #include <codecvt>
 #include <cstdlib>

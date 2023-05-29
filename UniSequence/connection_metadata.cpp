@@ -2,9 +2,10 @@
 #include "connection_metadata.h"
 #include "UniSequence.h"
 
-connection_metadata::connection_metadata(int id, websocketpp::connection_hdl hdl, string uri)
+connection_metadata::connection_metadata(int id, websocketpp::connection_hdl hdl, string uri, UniSequence* pUniSeq)
 	: m_id(id), m_hdl(hdl), m_status("Connecting"), m_uri(uri), m_server("N/A")
 {
+	uniptr = pUniSeq;
 }
 
 void connection_metadata::on_open(client* c, websocketpp::connection_hdl hdl)
@@ -33,13 +34,24 @@ void connection_metadata::on_close(client* c, websocketpp::connection_hdl hdl)
 void connection_metadata::on_message(websocketpp::connection_hdl, client::message_ptr msg) {
 	if (msg->get_opcode() == websocketpp::frame::opcode::text)
 	{
-		if(uniptr)uniptr->log(msg->get_payload());
-		//m_messages.push_back("<< " + msg->get_payload());
-	}
-	else
-	{
-		if(uniptr)uniptr->log(websocketpp::utility::to_hex(msg->get_payload()));
-		//m_messages.push_back("<< " + websocketpp::utility::to_hex(msg->get_payload()));
+		string resBody = msg->get_payload().c_str();
+		nlohmann::json ws_data_json = nlohmann::json::parse(resBody);
+		int seqNum = 1;
+		try
+		{
+			for (auto& seqObj : ws_data_json)
+			{
+				string cs = seqObj[JSON_KEY_CALLSIGN];
+				int status = seqObj[JSON_KEY_STATUS];
+				uniptr->SyncSeq(cs, status);
+				uniptr->SyncSeqNum(cs, seqNum);
+				seqNum++;
+			}
+		}
+		catch (exception& const e)
+		{
+			uniptr->Messager(e.what());
+		}
 	}
 }
 

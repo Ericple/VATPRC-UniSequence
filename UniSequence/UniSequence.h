@@ -3,7 +3,7 @@
  #define RELEASE
 // uncomment this when in official release
 // #define PATCH_WITH_LOGON_CODE
-//#define USE_WEBSOCKET
+#define USE_WEBSOCKET
 
 using namespace std;
 using namespace EuroScopePlugIn;
@@ -14,11 +14,12 @@ using namespace EuroScopePlugIn;
 #define GITHUB_UPDATE "https://api.github.com"
 #define GITHUB_UPDATE_PATH "/repos/Ericple/VATPRC-UniSequence/releases"
 #define SERVER_ADDRESS_PRC "https://q.vatprc.net"
+#define WS_ADDRESS_PRC "ws://q.vatprc.net"
 #define SERVER_ADDRESS_WITH_PORT "https://q.vatprc.net:443"
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "v0.4.0-beta"
+#define PLUGIN_VER "v0.4.1-beta"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif
@@ -105,29 +106,32 @@ typedef struct SequenceNode {
 	bool seqNumUpdated;
 } SeqN;
 
-struct AirportSocket {
+typedef struct AirportSocket {
 	string icao;
-	thread* socketThread;
-};
+	int socketId;
+} asoc;
 
 class UniSequence : public CPlugIn
 {
 public:
 	UniSequence();
 	~UniSequence();
-	future<string> bufferQueueString;
 	virtual bool OnCompileCommand(const char*);
 	virtual void OnFunctionCall(int, const char*, POINT, RECT);
 	virtual void OnGetTagItem(CFlightPlan, CRadarTarget, 
 		int, int, char[16], int*, COLORREF*, double*);
 	void Messager(string);
 	vector<string> airportList;
-	vector<AirportSocket> socketList;
+	vector<asoc> socketList;
 	vector<SeqN> sequence;
 	// log related
 	void endLog();
 	ofstream logStream;
+	ifstream wsReadStream;
 	void log(string);
+	string activeWsSyncString;
+	void SyncSeq(string, int);
+	void SyncSeqNum(string, int);
 private:
 	mutex sequenceLock;
 	thread* dataSyncThread;
@@ -141,8 +145,6 @@ private:
 	void RemoveFromSeq(CFlightPlan);
 	void RemoveFromSeq(string);
 	void CheckApEnabled(string);
-	void SyncSeq(string, int);
-	void SyncSeqNum(string, int);
 	void ClearUpdateFlag();
 	void PatchStatus(CFlightPlan, int);
 	bool seqOpLock = false;

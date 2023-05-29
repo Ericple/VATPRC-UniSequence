@@ -2,7 +2,7 @@
 #include "websocket_endpoint.h"
 #include "connection_metadata.h"
 
-websocket_endpoint::websocket_endpoint() : m_next_id(0) {
+websocket_endpoint::websocket_endpoint(UniSequence* ptr) : m_next_id(0) {
     m_endpoint.clear_access_channels(websocketpp::log::alevel::all);
     m_endpoint.clear_error_channels(websocketpp::log::elevel::all);
 
@@ -10,6 +10,7 @@ websocket_endpoint::websocket_endpoint() : m_next_id(0) {
     m_endpoint.start_perpetual();
 
     m_thread = websocketpp::lib::make_shared<websocketpp::lib::thread>(&client::run, &m_endpoint);
+    uniptr = ptr;
 }
 
 websocket_endpoint::~websocket_endpoint() {
@@ -34,7 +35,7 @@ int websocket_endpoint::connect(std::string const& uri) {
     client::connection_ptr con = m_endpoint.get_connection(uri, ec);
 
     int new_id = m_next_id++;
-    connection_metadata::ptr metadata_ptr = websocketpp::lib::make_shared<connection_metadata>(new_id, con->get_handle(), uri);
+    connection_metadata::ptr metadata_ptr = websocketpp::lib::make_shared<connection_metadata>(new_id, con->get_handle(), uri, uniptr);
     m_connection_list[new_id] = metadata_ptr;
 
     con->set_open_handler(websocketpp::lib::bind(

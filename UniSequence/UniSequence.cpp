@@ -101,43 +101,58 @@ UniSequence::UniSequence(void) : CPlugIn(
 	RegisterTagItemFunction("Sequence Reorder", SEQUENCE_TAGITEM_FUNC_REORDER);
 #ifdef USE_WEBSOCKET
 	wsSyncThread = new thread([&] {
-		bool socketExistFlag = false;
+		websocket_endpoint endpoint(this);
+		string restfulVer = SERVER_RESTFUL_VER;
 		while (true)
 		{
-			socketExistFlag = false;
-			if (airportList.size() == 0) continue;
-			OutputDebugStringA("正在尝试遍历airportList以建立websocket\r\n");
 			for (auto& airport : airportList)
 			{
-				OutputDebugStringA("正在尝试建立有关\r\n");
-				for (auto& socketObj : socketList)
+				bool socketexist = false;
+				for (auto& socket : socketList)
 				{
-					if (socketObj.icao == airport) socketExistFlag = true;
-				}
-				if (!socketExistFlag)
-				{
-					try
+					if (socket.icao == airport)
 					{
-						thread* socketThread = new thread([&] {
-							websocket_endpoint endpoint;
-
-							string restfulVer = SERVER_RESTFUL_VER;
-							int id = endpoint.connect(SERVER_ADDRESS_PRC + restfulVer + airport + "/ws");
-							if (id)
-							{
-								Messager("Ws connection established, fetching data of " + airport);
-							}
-							});
-						socketList.push_back({ airport, socketThread });
-						socketThread->detach();
+						socketexist = true;
 					}
-					catch (const exception& e)
+				}
+				if (!socketexist)
+				{
+					int id = endpoint.connect(WS_ADDRESS_PRC + restfulVer + airport + "/ws");
+					if (id >= 0)
 					{
-						Messager(e.what());
+						socketList.push_back({ airport, id });
+						Messager("Ws connection established, fetching data of " + airport);
+					}
+					else
+					{
+						Messager("Ws connection failed.");
 					}
 				}
 			}
-			this_thread::sleep_for(chrono::seconds(15));
+			// Delete airports that no longer exist in the local airport list
+			for (auto& socket : socketList)
+			{
+				bool apexist = false;
+				for (auto& airport : airportList)
+				{
+					if (airport == socket.icao) 
+					{
+						apexist = true;
+					}
+				}
+				if (!apexist) endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
+			}
+			// 如果有ws断线，则尝试重连
+			int socketoffset = 0;
+			for (auto& socket : socketList)
+			{
+				if (endpoint.get_metadata(socket.socketId).get()->get_status() == "")
+				{
+					socketList.erase(socketList.begin() + socketoffset);
+				}
+				socketoffset++;
+			}
+			this_thread::sleep_for(chrono::seconds(5));
 		}
 		});
 	wsSyncThread->detach();
@@ -208,7 +223,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 				string publishDate = versionInfo[0]["created_at"];
 				if (versionTag != PLUGIN_VER)
 				{
-					Messager("Notification: Update is available! The latest version is: " + versionName + " " + versionTag + " Publish date: " + publishDate);
+					Messager("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
 				}
 				else
 				{
@@ -220,7 +235,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 				
 				Messager("Error occured while checking updates - "+httplib::to_string(result.error()));
 			}
-			this_thread::sleep_for(chrono::minutes(5));
+			this_thread::sleep_for(chrono::minutes(15));
 		}
 		});
 	updateCheckThread->detach();
@@ -228,7 +243,15 @@ UniSequence::UniSequence(void) : CPlugIn(
 	Messager("Initialization complete.");
 }
 
-UniSequence::~UniSequence(void){}
+UniSequence::~UniSequence(void)
+{
+#ifndef USE_WEBSOCKET
+	TerminateThread(dataSyncThread, 0);
+#else
+	TerminateThread(wsSyncThread, 0);
+#endif // !USE_WEBSOCKET
+	TerminateThread(updateCheckThread, 0);
+}
 
 void UniSequence::Messager(string message)
 {
@@ -414,7 +437,6 @@ void UniSequence::RemoveFromSeq(CFlightPlan fp)
 			_itoa_s(offset, offsetStr, 10);
 			log("Removing");
 			sequence.erase(sequence.begin() + offset);
-			log("removed");
 			return;
 		}
 		offset++;

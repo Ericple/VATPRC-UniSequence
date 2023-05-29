@@ -7,7 +7,7 @@ class connection_metadata
 {
 public:
 	typedef websocketpp::lib::shared_ptr<connection_metadata> ptr;
-	connection_metadata(int, websocketpp::connection_hdl, string);
+	connection_metadata(int, websocketpp::connection_hdl, string, UniSequence*);
 	void on_open(client*, websocketpp::connection_hdl);
 	void on_fail(client*, websocketpp::connection_hdl);
 	void on_close(client*, websocketpp::connection_hdl);
@@ -15,6 +15,7 @@ public:
 	websocketpp::connection_hdl get_hdl() const;
 	int get_id() const;
 	string get_status() const;
+	ofstream wsDataStream;
 private:
 	int m_id;
 	websocketpp::connection_hdl m_hdl;

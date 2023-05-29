@@ -3,16 +3,16 @@
 #include "UniSequence.h"
 using namespace EuroScopePlugIn;
 
-UniSequence* pMyPlugIn = nullptr;
+UniSequence* pPlugIn = nullptr;
 
 void __declspec (dllexport)
 EuroScopePlugInInit(CPlugIn** ppPluginInstance)
 {
-	*ppPluginInstance = pMyPlugIn = new UniSequence;
+	*ppPluginInstance = pPlugIn = new UniSequence;
 }
 
 void __declspec (dllexport)
 EuroScopePlugInExit(void)
 {
-	delete pMyPlugIn;
+	delete pPlugIn;
 }

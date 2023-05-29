@@ -7,7 +7,7 @@ using namespace std;
 class websocket_endpoint
 {
 public:
-	websocket_endpoint();
+	websocket_endpoint(UniSequence*);
 	~websocket_endpoint();
 	int connect(string const&);
 	void close(int, websocketpp::close::status::value, string);
@@ -20,5 +20,6 @@ private:
 
 	con_list m_connection_list;
 	int m_next_id;
+	UniSequence* uniptr;
 };
 

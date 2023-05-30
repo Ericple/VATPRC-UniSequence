@@ -47,6 +47,12 @@ void connection_metadata::on_message(websocketpp::connection_hdl, client::messag
 				uniptr->SyncSeqNum(cs, seqNum);
 				seqNum++;
 			}
+			// If the unit does not exist remotely, remove it from the local list
+			for (auto& seqN : uniptr->sequence)
+			{
+				if (!seqN.seqNumUpdated) uniptr->RemoveFromSeq(seqN.fp.GetCallsign());
+			}
+			uniptr->ClearUpdateFlag();
 		}
 		catch (exception& const e)
 		{

@@ -388,13 +388,12 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 	thread patchThread([fp, status, this] {
 		json reqBody = {
 			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
-			{JSON_KEY_STATUS, status},
-			{JSON_KEY_LOGON_CODE, logonCode}
+			{JSON_KEY_STATUS, status}
 		};
 		httplib::Client patchReq(SERVER_ADDRESS_PRC);
 		patchReq.set_connection_timeout(10, 0);
 		string ap = fp.GetFlightPlanData().GetOrigin();
-		if (auto result = patchReq.Patch(SERVER_RESTFUL_VER + ap + "/status", reqBody.dump().c_str(), "application/json"))
+		if (auto result = patchReq.Patch(SERVER_RESTFUL_VER + ap + "/status", {{HEADER_LOGON_KEY, logonCode}}, reqBody.dump().c_str(), "application/json"))
 		{
 			if (result->status == 200)
 			{
@@ -407,6 +406,12 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 					SyncSeqNum(seqObj[JSON_KEY_CALLSIGN], seqNumber);
 					seqNumber++;
 				}
+				// If the unit does not exist remotely, remove it from the local list
+				for (auto& seqN : sequence)
+				{
+					if (!seqN.seqNumUpdated) RemoveFromSeq(seqN.fp.GetCallsign());
+				}
+				ClearUpdateFlag();
 			}
 		}
 		else
@@ -480,10 +485,9 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 			string ap = fp.GetFlightPlanData().GetOrigin();
 			json reqBody = {
 				{JSON_KEY_CALLSIGN, fp.GetCallsign()},
-				{JSON_KEY_BEFORE, sItemString},
-				{JSON_KEY_LOGON_CODE, logonCode}
+				{JSON_KEY_BEFORE, sItemString}
 			};
-			if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", reqBody.dump(), "application/json"))
+			if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", {{HEADER_LOGON_KEY, logonCode}}, reqBody.dump(), "application/json"))
 			{
 				if (res->status == 200)
 				{

@@ -89,11 +89,11 @@ using namespace EuroScopePlugIn;
 #endif // !MESSAGE
 
 #ifndef REQUEST_RELATED
-#define JSON_KEY_LOGON_CODE "code"
 #define JSON_KEY_CALLSIGN "callsign"
 #define JSON_KEY_STATUS "status"
 #define JSON_KEY_BEFORE "before"
 #define DEFAULT_LOGON_CODE "testlogon"
+#define HEADER_LOGON_KEY "Authorization"
 #endif // !REQUEST_RELATED
 
 #ifndef LOGGER_RELATED
@@ -132,6 +132,13 @@ public:
 	string activeWsSyncString;
 	void SyncSeq(string, int);
 	void SyncSeqNum(string, int);
+	void RemoveFromSeq(CFlightPlan);
+	void RemoveFromSeq(string);
+	void ClearUpdateFlag();
+	SeqN* GetSeqN(CFlightPlan);
+	void PushToSeq(CFlightPlan);
+	void CheckApEnabled(string);
+	void PatchStatus(CFlightPlan, int);
 private:
 	mutex sequenceLock;
 	thread* dataSyncThread;
@@ -140,12 +147,5 @@ private:
 	bool syncThreadFlag = true, updateCheckFlag = true;
 	const char* logonCode;
 	int timerInterval = 5;
-	SeqN* GetSeqN(CFlightPlan);
-	void PushToSeq(CFlightPlan);
-	void RemoveFromSeq(CFlightPlan);
-	void RemoveFromSeq(string);
-	void CheckApEnabled(string);
-	void ClearUpdateFlag();
-	void PatchStatus(CFlightPlan, int);
 };
 

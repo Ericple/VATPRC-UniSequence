@@ -92,7 +92,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 )
 {
 	// Clear local log
-	if (!remove(LOG_FILE_NAME)) Messager("log file not found.");
+	if (remove(LOG_FILE_NAME) < 0) Messager("log file not found.");
 	log("UniSequence initializing");
 	log("Attempting to register tag item type of \"Sequence\"");
 	// Registering a Tag Object for EuroScope
@@ -103,7 +103,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 	wsSyncThread = new thread([&] {
 		websocket_endpoint endpoint(this);
 		string restfulVer = SERVER_RESTFUL_VER;
-		while (true)
+		while (syncThreadFlag)
 		{
 			for (auto& airport : airportList)
 			{
@@ -142,7 +142,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 				}
 				if (!apexist) endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
 			}
-			// 如果有ws断线，则尝试重连
+			// If there is a disconnection in ws, remove this socket from the list directly.
 			int socketoffset = 0;
 			for (auto& socket : socketList)
 			{
@@ -158,10 +158,9 @@ UniSequence::UniSequence(void) : CPlugIn(
 	wsSyncThread->detach();
 #else
 	dataSyncThread = new thread([&] {
-		syncThreadFlag = true;
 		httplib::Client requestClient(SERVER_ADDRESS_PRC);
 		requestClient.set_connection_timeout(5, 0);
-		while (true)
+		while (syncThreadFlag)
 		{
 			try
 			{
@@ -212,9 +211,8 @@ UniSequence::UniSequence(void) : CPlugIn(
 		httplib::Client updateReq(GITHUB_UPDATE);
 		updateReq.set_connection_timeout(10, 0);
 		Messager("Start updates check routine.");
-		while (true)
+		while (updateCheckFlag)
 		{
-			Messager("Checking updates...");
 			if (auto result = updateReq.Get(GITHUB_UPDATE_PATH))
 			{
 				json versionInfo = json::parse(result->body);
@@ -225,16 +223,13 @@ UniSequence::UniSequence(void) : CPlugIn(
 				{
 					Messager("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
 				}
-				else
-				{
-					Messager("Your plugin is up to date.");
-				}
+				// Now, an update prompt will only appear when and only when there is an update, without indicating that this plugin is the latest version
 			}
 			else
 			{
-				
 				Messager("Error occured while checking updates - "+httplib::to_string(result.error()));
 			}
+			// Check for updates every 15 minutes.
 			this_thread::sleep_for(chrono::minutes(15));
 		}
 		});
@@ -245,12 +240,10 @@ UniSequence::UniSequence(void) : CPlugIn(
 
 UniSequence::~UniSequence(void)
 {
-#ifndef USE_WEBSOCKET
-	TerminateThread(dataSyncThread, 0);
-#else
-	TerminateThread(wsSyncThread, 0);
-#endif // !USE_WEBSOCKET
-	TerminateThread(updateCheckThread, 0);
+	syncThreadFlag = false;
+	updateCheckFlag = false;
+	// Wait for the two threads above quit themselves nicely.
+	this_thread::sleep_for(chrono::seconds(5));
 }
 
 void UniSequence::Messager(string message)

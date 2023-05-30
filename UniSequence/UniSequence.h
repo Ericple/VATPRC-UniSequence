@@ -1,8 +1,8 @@
 #pragma once
 
  #define RELEASE
-// uncomment this when in official release
-// #define PATCH_WITH_LOGON_CODE
+
+#define PATCH_WITH_LOGON_CODE
 #define USE_WEBSOCKET
 
 using namespace std;
@@ -19,7 +19,7 @@ using namespace EuroScopePlugIn;
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "v0.4.1-beta"
+#define PLUGIN_VER "v1.0.1"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif
@@ -137,8 +137,8 @@ private:
 	thread* dataSyncThread;
 	thread* updateCheckThread;
 	thread* wsSyncThread;
-	bool syncThreadFlag = false;
-	const char* logonCode = DEFAULT_LOGON_CODE;
+	bool syncThreadFlag = true, updateCheckFlag = true;
+	const char* logonCode;
 	int timerInterval = 5;
 	SeqN* GetSeqN(CFlightPlan);
 	void PushToSeq(CFlightPlan);
@@ -147,6 +147,5 @@ private:
 	void CheckApEnabled(string);
 	void ClearUpdateFlag();
 	void PatchStatus(CFlightPlan, int);
-	bool seqOpLock = false;
 };
 

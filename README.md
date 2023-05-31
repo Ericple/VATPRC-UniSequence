@@ -1,9 +1,9 @@
 # UniSequence
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Ericple/VATPRC-UniSequence/msbuild.yml?style=flat-square)
-![GitHub Repo stars](https://img.shields.io/github/stars/Ericple/VATPRC-UniSequence?style=social)
 ![GitHub](https://img.shields.io/github/license/Ericple/VATPRC-UniSequence?style=flat-square)
 ![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/Ericple/VATPRC-UniSequence?display_name=tag&include_prereleases&style=flat-square)
+![GitHub Repo stars](https://img.shields.io/github/stars/Ericple/VATPRC-UniSequence?style=social)
 
 # INTRODUCTION
 

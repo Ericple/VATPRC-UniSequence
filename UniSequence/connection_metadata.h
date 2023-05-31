@@ -1,6 +1,6 @@
 #pragma once
 #include "UniSequence.h"
-
+#ifdef USE_WEBSOCKET
 using namespace std;
 
 class connection_metadata
@@ -25,4 +25,4 @@ private:
 	string m_error_reason;
 	UniSequence* uniptr;
 };
-
+#endif

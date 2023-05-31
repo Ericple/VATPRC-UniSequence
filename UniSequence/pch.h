@@ -8,14 +8,19 @@
 #define PCH_H
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
+#define PATCH_WITH_LOGON_CODE
+#define USE_WEBSOCKET
 
 // 添加要在此处预编译的标头
 #include "framework.h"
 #include <iostream>
+#ifdef USE_WEBSOCKET
 #include "websocketpp/config/asio_no_tls_client.hpp"
 #include "websocketpp/client.hpp"
 #include "websocketpp/common/thread.hpp"
 #include "websocketpp/common/memory.hpp"
+typedef websocketpp::client<websocketpp::config::asio_client> client;
+#endif
 #include <mutex>
 #include <locale>
 #include <codecvt>
@@ -34,6 +39,6 @@
 #include <vector>
 #include <thread>
 
-typedef websocketpp::client<websocketpp::config::asio_client> client;
+
 
 #endif //PCH_H

@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "websocket_endpoint.h"
 #include "connection_metadata.h"
-
+#ifdef USE_WEBSOCKET
 websocket_endpoint::websocket_endpoint(UniSequence* ptr) : m_next_id(0) {
     m_endpoint.clear_access_channels(websocketpp::log::alevel::all);
     m_endpoint.clear_error_channels(websocketpp::log::elevel::all);
@@ -85,3 +85,4 @@ connection_metadata::ptr websocket_endpoint::get_metadata(int id) const {
         return metadata_it->second;
     }
 }
+#endif

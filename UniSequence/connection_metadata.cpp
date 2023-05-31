@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "connection_metadata.h"
 #include "UniSequence.h"
-
+#ifdef USE_WEBSOCKET
 connection_metadata::connection_metadata(int id, websocketpp::connection_hdl hdl, string uri, UniSequence* pUniSeq)
 	: m_id(id), m_hdl(hdl), m_status("Connecting"), m_uri(uri), m_server("N/A")
 {
@@ -72,3 +72,5 @@ int connection_metadata::get_id() const {
 string connection_metadata::get_status() const {
 	return m_status;
 }
+
+#endif

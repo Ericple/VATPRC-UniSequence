@@ -134,7 +134,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>.\lib\EuroScopePlugInDll.lib;.\lib\libssl.lib;.\lib\libcrypto.lib;.\lib\libboost_random-vc143-mt-gd-x32-1_82.lib</AdditionalDependencies>
+      <AdditionalDependencies>.\lib\EuroScopePlugInDll.lib;.\lib\libssl.lib;.\lib\libcrypto.lib</AdditionalDependencies>
       <AssemblyDebug>false</AssemblyDebug>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
@@ -150,7 +150,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>D:\Program Files %28x86%29\OpenSSL-Win32\include;.\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -218,18 +218,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="connection_metadata.h" />
-    <ClInclude Include="CWsClient.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="lib\include\curl\curl.h" />
-    <ClInclude Include="lib\include\curl\curlver.h" />
-    <ClInclude Include="lib\include\curl\easy.h" />
     <ClInclude Include="lib\include\curl\mprintf.h" />
-    <ClInclude Include="lib\include\curl\multi.h" />
-    <ClInclude Include="lib\include\curl\options.h" />
-    <ClInclude Include="lib\include\curl\stdcheaders.h" />
-    <ClInclude Include="lib\include\curl\system.h" />
-    <ClInclude Include="lib\include\curl\typecheck-gcc.h" />
-    <ClInclude Include="lib\include\curl\urlapi.h" />
     <ClInclude Include="lib\include\EuroScopePlugIn.h" />
     <ClInclude Include="lib\include\json.hpp" />
     <ClInclude Include="pch.h" />
@@ -239,7 +229,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="connection_metadata.cpp" />
-    <ClCompile Include="CWsClient.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

@@ -29,9 +29,6 @@ void UniSequence::SyncSeq(string callsign, int status)
 	{
 		if (seqN.fp.GetCallsign() == callsign)
 		{
-#ifndef RELEASE
-			OutputDebugStringA("Synchronizing status of " + *callsign.c_str());
-#endif // ENV_DEBUG
 			seqN.status = status;
 			log("Sync complete.");
 			return;
@@ -57,9 +54,6 @@ void UniSequence::SyncSeqNum(string callsign, int seqNum)
 	{
 		if (seqN.fp.GetCallsign() == callsign)
 		{
-#ifndef RELEASE
-			OutputDebugStringA("Synchronizing sequence number\r\n");
-#endif // RELEASE
 			seqN.sequenceNumber = seqNum;
 			log("Sync complete.");
 			seqN.seqNumUpdated = true;
@@ -345,7 +339,9 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
 				{
 					log("Saving logon code: " + item + " to settings");
-					SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, item.c_str());
+					string lowercode = item.c_str();
+					transform(lowercode.begin(), lowercode.end(), lowercode.begin(), ::tolower);
+					SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, lowercode.c_str());
 					log("Logon code saved.");
 				}
 			}
@@ -378,6 +374,7 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 {
 	string cs = fp.GetCallsign();
 	log("Attempting to patch status of " + cs);
+	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 #ifdef PATCH_WITH_LOGON_CODE
 	if (!logonCode)
 	{
@@ -412,6 +409,13 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 					if (!seqN.seqNumUpdated) RemoveFromSeq(seqN.fp.GetCallsign());
 				}
 				ClearUpdateFlag();
+			}
+			else
+			{
+				if (result->status == 403)
+				{
+					Messager("Logon code verification failed.");
+				}
 			}
 		}
 		else
@@ -471,6 +475,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:
 		log("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
+		logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 #ifdef PATCH_WITH_LOGON_CODE
 		if (!logonCode)
 		{

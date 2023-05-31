@@ -30,40 +30,10 @@
     <ClInclude Include="UniSequence.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="lib\include\curl\curl.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lib\include\curl\curlver.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lib\include\curl\easy.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="lib\include\curl\mprintf.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="lib\include\curl\multi.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lib\include\curl\options.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lib\include\curl\stdcheaders.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lib\include\curl\system.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lib\include\curl\typecheck-gcc.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lib\include\curl\urlapi.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="queueItem.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="CWsClient.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="connection_metadata.h">
@@ -81,9 +51,6 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="UniSequence.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="CWsClient.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="connection_metadata.cpp">

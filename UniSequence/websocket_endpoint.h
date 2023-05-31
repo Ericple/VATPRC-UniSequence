@@ -1,7 +1,7 @@
 #pragma once
 #include "connection_metadata.h"
 #include "UniSequence.h"
-
+#ifdef USE_WEBSOCKET
 using namespace std;
 
 class websocket_endpoint
@@ -23,3 +23,4 @@ private:
 	UniSequence* uniptr;
 };
 
+#endif

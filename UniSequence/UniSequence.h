@@ -1,10 +1,5 @@
 #pragma once
 
- #define RELEASE
-
-#define PATCH_WITH_LOGON_CODE
-#define USE_WEBSOCKET
-
 using namespace std;
 using namespace EuroScopePlugIn;
 

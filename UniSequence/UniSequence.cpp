@@ -27,6 +27,7 @@ void UniSequence::SyncSeq(string callsign, int status)
 	log("Synchronizing sequence status for " + callsign);
 	for (auto& seqN : sequence)
 	{
+		if (!seqN.fp.IsValid()) continue;
 		if (seqN.fp.GetCallsign() == callsign)
 		{
 			seqN.status = status;
@@ -65,12 +66,12 @@ void UniSequence::SyncSeqNum(string callsign, int seqNum)
 	log("Synchronizing sequence number for " + callsign);
 	for (auto& seqN : sequence)
 	{
+		if (!seqN.fp.IsValid()) return;
 		if (seqN.fp.GetCallsign() == callsign)
 		{
 			seqN.sequenceNumber = seqNum;
 			log("Sync complete.");
 			seqN.seqNumUpdated = true;
-			
 			return;
 		}
 	}

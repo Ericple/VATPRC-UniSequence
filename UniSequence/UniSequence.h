@@ -129,16 +129,20 @@ public:
 	void SyncSeqNum(string, int);
 	void RemoveFromSeq(CFlightPlan);
 	void RemoveFromSeq(string);
-	void ClearUpdateFlag();
+	void ClearUpdateFlag(string);
 	SeqN* GetSeqN(CFlightPlan);
 	void PushToSeq(CFlightPlan);
 	void CheckApEnabled(string);
 	void PatchStatus(CFlightPlan, int);
-private:
 	mutex sequenceLock;
-	thread* dataSyncThread;
+	mutex seqremovelock;
+private:
 	thread* updateCheckThread;
+#ifdef USE_WEBSOCKET
 	thread* wsSyncThread;
+#else
+	thread* dataSyncThread;
+#endif
 	bool syncThreadFlag = true, updateCheckFlag = true;
 	const char* logonCode;
 	int timerInterval = 5;

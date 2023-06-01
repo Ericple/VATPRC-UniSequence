@@ -7,7 +7,7 @@ class connection_metadata
 {
 public:
 	typedef websocketpp::lib::shared_ptr<connection_metadata> ptr;
-	connection_metadata(int, websocketpp::connection_hdl, string, UniSequence*);
+	connection_metadata(int, websocketpp::connection_hdl, string, UniSequence*, string);
 	void on_open(client*, websocketpp::connection_hdl);
 	void on_fail(client*, websocketpp::connection_hdl);
 	void on_close(client*, websocketpp::connection_hdl);
@@ -24,5 +24,6 @@ private:
 	string m_server;
 	string m_error_reason;
 	UniSequence* uniptr;
+	string icao;
 };
 #endif

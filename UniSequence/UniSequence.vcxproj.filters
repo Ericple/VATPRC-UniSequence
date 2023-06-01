@@ -30,12 +30,6 @@
     <ClInclude Include="UniSequence.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="lib\include\curl\mprintf.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="queueItem.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="connection_metadata.h">
       <Filter>头文件</Filter>
     </ClInclude>

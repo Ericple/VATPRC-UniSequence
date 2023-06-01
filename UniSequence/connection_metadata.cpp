@@ -1,11 +1,12 @@
 #include "pch.h"
+#ifdef USE_WEBSOCKET
 #include "connection_metadata.h"
 #include "UniSequence.h"
-#ifdef USE_WEBSOCKET
-connection_metadata::connection_metadata(int id, websocketpp::connection_hdl hdl, string uri, UniSequence* pUniSeq)
+connection_metadata::connection_metadata(int id, websocketpp::connection_hdl hdl, string uri, UniSequence* pUniSeq, string apcode)
 	: m_id(id), m_hdl(hdl), m_status("Connecting"), m_uri(uri), m_server("N/A")
 {
 	uniptr = pUniSeq;
+	icao = apcode;
 }
 
 void connection_metadata::on_open(client* c, websocketpp::connection_hdl hdl)
@@ -47,14 +48,9 @@ void connection_metadata::on_message(websocketpp::connection_hdl, client::messag
 				uniptr->SyncSeqNum(cs, seqNum);
 				seqNum++;
 			}
-			// If the unit does not exist remotely, remove it from the local list
-			for (auto& seqN : uniptr->sequence)
-			{
-				if (!seqN.seqNumUpdated) uniptr->RemoveFromSeq(seqN.fp.GetCallsign());
-			}
-			uniptr->ClearUpdateFlag();
+			uniptr->ClearUpdateFlag(icao);
 		}
-		catch (exception& const e)
+		catch (exception const& e)
 		{
 			uniptr->Messager(e.what());
 		}

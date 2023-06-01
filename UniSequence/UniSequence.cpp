@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "UniSequence.h"
-#include "queueItem.h"
 #include "websocket_endpoint.h"
 
 using namespace std;
@@ -30,6 +29,7 @@ void UniSequence::SyncSeq(string callsign, int status)
 		if (seqN.fp.GetCallsign() == callsign)
 		{
 			seqN.status = status;
+			seqN.seqNumUpdated = true;
 			log("Sync complete.");
 			return;
 		}
@@ -38,11 +38,21 @@ void UniSequence::SyncSeq(string callsign, int status)
 }
 
 // This function is not allowed to be called in non threads, otherwise it may cause access conflicts
-void UniSequence::ClearUpdateFlag()
+void UniSequence::ClearUpdateFlag(string airport)
 {
-	for (auto& ac : sequence)
+	lock_guard<mutex> guard(seqremovelock);
+	// If the unit does not exist remotely, remove it from the local list
+	for (auto& seqN : sequence)
 	{
-		if (ac.seqNumUpdated) ac.seqNumUpdated = false;
+		if (!seqN.seqNumUpdated && seqN.fp.GetFlightPlanData().GetOrigin() == airport)
+		{
+			RemoveFromSeq(seqN.fp.GetCallsign());
+			
+		}
+		else
+		{
+			seqN.seqNumUpdated = false;
+		}
 	}
 }
 
@@ -68,15 +78,13 @@ void UniSequence::SyncSeqNum(string callsign, int seqNum)
 void UniSequence::RemoveFromSeq(string callsign)
 {
 	lock_guard<mutex> guard(sequenceLock);
-	int offset = 0;
 	for (auto& seqN : sequence)
 	{
 		if (seqN.fp.GetCallsign() == callsign)
 		{
-			sequence.erase(sequence.begin() + offset);
+			seqN.status = 999;
 			return;
 		}
-		offset++;
 	}
 }
 
@@ -86,7 +94,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 )
 {
 	// Clear local log
-	if (remove(LOG_FILE_NAME) < 0) Messager("log file not found.");
+	remove(LOG_FILE_NAME);
 	log("UniSequence initializing");
 	log("Attempting to register tag item type of \"Sequence\"");
 	// Registering a Tag Object for EuroScope
@@ -111,7 +119,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 				}
 				if (!socketexist)
 				{
-					int id = endpoint.connect(WS_ADDRESS_PRC + restfulVer + airport + "/ws");
+					int id = endpoint.connect(WS_ADDRESS_PRC + restfulVer + airport + "/ws", airport);
 					if (id >= 0)
 					{
 						socketList.push_back({ airport, id });
@@ -175,11 +183,6 @@ UniSequence::UniSequence(void) : CPlugIn(
 							SyncSeq(seqObj["callsign"], seqObj["status"]);
 							SyncSeqNum(seqObj["callsign"], seqNumber);
 							seqNumber++;
-						}
-						// If the unit does not exist remotely, remove it from the local list
-						for (auto& seqN : sequence)
-						{
-							if (!seqN.seqNumUpdated) RemoveFromSeq(seqN.fp.GetCallsign());
 						}
 						ClearUpdateFlag();
 					}
@@ -346,7 +349,6 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 				}
 			}
 			Messager(MSG_LOGON_CODE_SAVED);
-			if (!syncThreadFlag) dataSyncThread->detach();
 		}
 		catch (runtime_error const& e)
 		{
@@ -403,12 +405,7 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 					SyncSeqNum(seqObj[JSON_KEY_CALLSIGN], seqNumber);
 					seqNumber++;
 				}
-				// If the unit does not exist remotely, remove it from the local list
-				for (auto& seqN : sequence)
-				{
-					if (!seqN.seqNumUpdated) RemoveFromSeq(seqN.fp.GetCallsign());
-				}
-				ClearUpdateFlag();
+				ClearUpdateFlag(ap);
 			}
 			else
 			{
@@ -430,18 +427,13 @@ void UniSequence::RemoveFromSeq(CFlightPlan fp)
 {
 	lock_guard<mutex> guard(sequenceLock);
 	log("Removing from local sequence");
-	int offset = 0;
 	for (auto& ac : sequence)
 	{
 		if (ac.fp.GetCallsign() == fp.GetCallsign())
 		{
-			char offsetStr[3];
-			_itoa_s(offset, offsetStr, 10);
-			log("Removing");
-			sequence.erase(sequence.begin() + offset);
+			ac.status = 999;
 			return;
 		}
-		offset++;
 	}
 	log("not in local sequence, nothing happend.");
 	
@@ -504,12 +496,8 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 						SyncSeqNum(seqObj["callsign"], seqNumber);
 						seqNumber++;
 					}
-					// If the unit does not exist remotely, remove it from the local list
-					for (auto& seqN : sequence)
-					{
-						if (!seqN.seqNumUpdated) RemoveFromSeq(seqN.fp.GetCallsign());
-					}
-					ClearUpdateFlag();
+
+					ClearUpdateFlag(ap);
 				}
 			}
 			else
@@ -579,12 +567,7 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	// check if item code is what we need to handle
 	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;
 	// remove aircraft if it's taking off
-	if (rt.GetGS() > 50)
-	{
-		log("Radar target's ground speed greater than 50kts, removing it.");
-		RemoveFromSeq(fp);
-		return;
-	}
+	if (rt.GetGS() > 50) return;
 	// automatically check if the departure airport of this fp is in the airport list
 	string depAirport = fp.GetFlightPlanData().GetOrigin();
 	CheckApEnabled(depAirport);

@@ -9,7 +9,7 @@ class websocket_endpoint
 public:
 	websocket_endpoint(UniSequence*);
 	~websocket_endpoint();
-	int connect(string const&);
+	int connect(string const&, string);
 	void close(int, websocketpp::close::status::value, string);
 	connection_metadata::ptr get_metadata(int) const;
 private:

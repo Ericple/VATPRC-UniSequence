@@ -45,7 +45,9 @@ void UniSequence::ClearUpdateFlag(string airport)
 	// If the unit does not exist remotely, remove it from the local list
 	for (auto& seqN : sequence)
 	{
-		if (!seqN.seqNumUpdated && seqN.fp.GetFlightPlanData().GetOrigin() == airport)
+		if (!seqN.fp.IsValid()) continue;
+		string getAp = seqN.fp.GetFlightPlanData().GetOrigin();
+		if (!seqN.seqNumUpdated && airport == getAp)
 		{
 			RemoveFromSeq(seqN.fp.GetCallsign());
 			
@@ -83,7 +85,7 @@ void UniSequence::RemoveFromSeq(string callsign)
 	{
 		if (seqN.fp.GetCallsign() == callsign)
 		{
-			seqN.status = 999;
+			seqN.status = AIRCRAFT_STATUS_NULL;
 			return;
 		}
 	}
@@ -99,9 +101,10 @@ UniSequence::UniSequence(void) : CPlugIn(
 	log("UniSequence initializing");
 	log("Attempting to register tag item type of \"Sequence\"");
 	// Registering a Tag Object for EuroScope
-	RegisterTagItemType("Sequence", SEQUENCE_TAGITEM_TYPE_CODE);
-	RegisterTagItemFunction("Sequence Popup List", SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
-	RegisterTagItemFunction("Sequence Reorder", SEQUENCE_TAGITEM_FUNC_REORDER);
+	RegisterTagItemType(SEQUENCE_TAGITEM_TYPE_CODE_NAME, SEQUENCE_TAGITEM_TYPE_CODE);
+	RegisterTagItemFunction(SEQUENCE_TAGFUNC_SWITCH_STATUS, SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
+	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_INPUT, SEQUENCE_TAGITEM_FUNC_REORDER);
+	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_SELECT, SEQUENCE_TAGITEM_FUNC_REORDER_SELECT);
 #ifdef USE_WEBSOCKET
 	wsSyncThread = new thread([&] {
 		websocket_endpoint endpoint(this);
@@ -240,8 +243,6 @@ UniSequence::~UniSequence(void)
 {
 	syncThreadFlag = false;
 	updateCheckFlag = false;
-	// Wait for the two threads above quit themselves nicely.
-	this_thread::sleep_for(chrono::seconds(5));
 }
 
 void UniSequence::Messager(string message)
@@ -432,7 +433,7 @@ void UniSequence::RemoveFromSeq(CFlightPlan fp)
 	{
 		if (ac.fp.GetCallsign() == fp.GetCallsign())
 		{
-			ac.status = 999;
+			ac.status = AIRCRAFT_STATUS_NULL;
 			return;
 		}
 	}
@@ -443,10 +444,14 @@ void UniSequence::RemoveFromSeq(CFlightPlan fp)
 
 void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area)
 {
-	log("Function called by EuroScope");
+	log("Function called by EuroScope, function id: " + fId + *"param: " + *sItemString);
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
+	SeqN* thisAc = GetSeqN(fp);
+	// return if nullptr
+	if (!thisAc) return;
+	string beforeKey;
 	thread* reOrderThread;
 	switch (fId)
 	{
@@ -456,7 +461,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		break;
 	case SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE:
 		log("Function: SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE was called");
-		OpenPopupList(area, STATUS_LIST_TITLE, 2);
+		OpenPopupList(area, fp.GetCallsign(), 2);
 		AddPopupListElement(STATUS_DESC_WFCR, "", FUNC_SWITCH_TO_WFCR);
 		AddPopupListElement(STATUS_DESC_CLRD, "", FUNC_SWITCH_TO_CLRD);
 		AddPopupListElement(STATUS_DESC_WFPU, "", FUNC_SWITCH_TO_WFPU);
@@ -465,6 +470,15 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		AddPopupListElement(STATUS_DESC_TAXI, "", FUNC_SWITCH_TO_TAXI);
 		AddPopupListElement(STATUS_DESC_WFTO, "", FUNC_SWITCH_TO_WFTO);
 		AddPopupListElement(STATUS_DESC_TKOF, "", FUNC_SWITCH_TO_TOGA);
+		break;
+	case SEQUENCE_TAGITEM_FUNC_REORDER_SELECT:
+		if (thisAc->status == AIRCRAFT_STATUS_NULL) return;
+		OpenPopupList(area, "PUT BEFORE", 2);
+		AddPopupListElement(SEQUENCE_TAGFUNC_REORDER_TOPKEY, "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
+		for (auto& aircraft : sequence)
+		{
+			if (aircraft.status == thisAc->status) AddPopupListElement(aircraft.fp.GetCallsign(), "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
+		}
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:
 		log("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
@@ -476,14 +490,22 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 			return;
 		}
 #endif // PATCH_WITH_LOGON_CODE
+		if (sItemString == SEQUENCE_TAGFUNC_REORDER_TOPKEY)
+		{
+			beforeKey = "-1";
+		}
+		else
+		{
+			beforeKey = sItemString;
+		}
 		log("Creating an new thread for reorder request");
-		reOrderThread = new thread([sItemString, fp, this] {
+		reOrderThread = new thread([beforeKey, fp, this] {
 			httplib::Client req(SERVER_ADDRESS_PRC);
 			req.set_connection_timeout(10, 0);
 			string ap = fp.GetFlightPlanData().GetOrigin();
 			json reqBody = {
 				{JSON_KEY_CALLSIGN, fp.GetCallsign()},
-				{JSON_KEY_BEFORE, sItemString}
+				{JSON_KEY_BEFORE, beforeKey}
 			};
 			if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", {{HEADER_LOGON_KEY, logonCode}}, reqBody.dump(), "application/json"))
 			{

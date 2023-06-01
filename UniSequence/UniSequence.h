@@ -14,7 +14,7 @@ using namespace EuroScopePlugIn;
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "v1.0.1"
+#define PLUGIN_VER "v1.1.1"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif
@@ -136,6 +136,7 @@ public:
 	void PatchStatus(CFlightPlan, int);
 	mutex sequenceLock;
 	mutex seqremovelock;
+	mutex loglock;
 private:
 	thread* updateCheckThread;
 #ifdef USE_WEBSOCKET

@@ -7,11 +7,15 @@ using nlohmann::json;
 
 void UniSequence::log(string message)
 {
-	SYSTEMTIME sysTime = { 0 };
-	GetSystemTime(&sysTime);
-	if (!logStream.is_open()) logStream.open(LOG_FILE_NAME, ios::app);
-	logStream << "[" << sysTime.wHour << ":" << sysTime.wMinute << ":" << sysTime.wSecond << "] " << message << endl;
-	logStream.close();
+	thread logThread([&] {
+		lock_guard<mutex> guard(loglock);
+		SYSTEMTIME sysTime = { 0 };
+		GetSystemTime(&sysTime);
+		if (!logStream.is_open()) logStream.open(LOG_FILE_NAME, ios::app);
+		logStream << "[" << sysTime.wHour << ":" << sysTime.wMinute << ":" << sysTime.wSecond << "] " << message << endl;
+		logStream.close();
+		});
+	logThread.detach();
 }
 
 void UniSequence::endLog()
@@ -184,7 +188,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 							SyncSeqNum(seqObj["callsign"], seqNumber);
 							seqNumber++;
 						}
-						ClearUpdateFlag();
+						ClearUpdateFlag(airport);
 					}
 					else
 					{

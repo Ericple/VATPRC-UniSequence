@@ -3,7 +3,7 @@
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #define PATCH_WITH_LOGON_CODE
-//#define USE_WEBSOCKET
+#define USE_WEBSOCKET
 
 #include "framework.h"
 #include <iostream>

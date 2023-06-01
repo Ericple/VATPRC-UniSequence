@@ -42,7 +42,7 @@ using namespace EuroScopePlugIn;
 #define STATUS_LIST_TITLE "Select Status"
 #define STATUS_TEXT_PLACE_HOLDER "________"
 #define AIRCRAFT_STATUS_NULL 999 // EMPTY STATUS
-#define STATUS_TEXT_NULL "ZZ-----"
+#define STATUS_TEXT_NULL "??-----"
 #define AIRCRAFT_STATUS_WFCR 70 // WAITING FOR CLEARANCE
 #define STATUS_TEXT_WFCR "-CLRD"
 #define STATUS_DESC_WFCR "Waiting for clearance"

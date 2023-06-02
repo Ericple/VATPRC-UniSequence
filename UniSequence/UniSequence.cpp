@@ -21,14 +21,24 @@ void UniSequence::endLog()
 	if(logStream.is_open()) logStream.close();
 }
 
+//void UniSequence::DeleteFromSeq(string callsign)
+//{
+//	lock_guard<mutex> guard(sequenceLock);
+//	log("Delete " + callsign + " from local queue");
+//	int offset = 0;
+//	for (auto& seqNode : sequence)
+//	{
+//		if(!seqNode.fp.IsValid())
+//	}
+//}
+
 void UniSequence::SyncSeq(string callsign, int status)
 {
 	lock_guard<mutex> guard(sequenceLock);
 	log("Synchronizing sequence status for " + callsign);
 	for (auto& seqN : sequence)
 	{
-		if (!seqN.fp.IsValid()) continue;
-		if (seqN.fp.GetCallsign() == callsign)
+		if (seqN.callsign == callsign)
 		{
 			seqN.status = status;
 			seqN.seqNumUpdated = true;
@@ -43,21 +53,20 @@ void UniSequence::SyncSeq(string callsign, int status)
 void UniSequence::ClearUpdateFlag(string airport)
 {
 	lock_guard<mutex> guard(seqremovelock);
+	CController ctr = ControllerMyself();
 	// If the unit does not exist remotely, remove it from the local list
 	for (auto& seqN : sequence)
 	{
-		if (!seqN.fp.IsValid()) continue;
-		string getAp = seqN.fp.GetFlightPlanData().GetOrigin();
-		if (!seqN.seqNumUpdated && airport == getAp)
+		if (!seqN.seqNumUpdated && airport == seqN.origin)
 		{
-			RemoveFromSeq(seqN.fp.GetCallsign());
-			
+			RemoveFromSeq(seqN.callsign);
 		}
 		else
 		{
 			seqN.seqNumUpdated = false;
 		}
 	}
+	FlightPlanSelect("a");
 }
 
 void UniSequence::SyncSeqNum(string callsign, int seqNum)
@@ -66,8 +75,7 @@ void UniSequence::SyncSeqNum(string callsign, int seqNum)
 	log("Synchronizing sequence number for " + callsign);
 	for (auto& seqN : sequence)
 	{
-		if (!seqN.fp.IsValid()) return;
-		if (seqN.fp.GetCallsign() == callsign)
+		if (seqN.callsign == callsign)
 		{
 			seqN.sequenceNumber = seqNum;
 			log("Sync complete.");
@@ -84,7 +92,7 @@ void UniSequence::RemoveFromSeq(string callsign)
 	lock_guard<mutex> guard(sequenceLock);
 	for (auto& seqN : sequence)
 	{
-		if (seqN.fp.GetCallsign() == callsign)
+		if (seqN.callsign == callsign)
 		{
 			seqN.status = AIRCRAFT_STATUS_NULL;
 			return;
@@ -258,7 +266,7 @@ SeqN* UniSequence::GetSeqN(CFlightPlan fp)
 	string cs = fp.GetCallsign();
 	for (auto& node : sequence)
 	{
-		if (node.fp.GetCallsign() == fp.GetCallsign()) return &node;
+		if (node.callsign == fp.GetCallsign()) return &node;
 	}
 	log("There's no sequence node for " + cs + ", returning nullptr");
 	return (SeqN*)nullptr;
@@ -367,8 +375,9 @@ void UniSequence::PushToSeq(CFlightPlan fp)
 {
 	lock_guard<mutex> guard(sequenceLock);
 	string cs = fp.GetCallsign();
+	string orig = fp.GetFlightPlanData().GetOrigin();
 	log("Initializing an new pointer for Sequence Node instance for " + cs);
-	SeqN seqN = *new SeqN{ fp, AIRCRAFT_STATUS_NULL, false };
+	SeqN seqN = *new SeqN{ cs, orig, AIRCRAFT_STATUS_NULL, false };
 	log("Pushing an new instance to local sequence vector.");
 	sequence.push_back(seqN);
 	
@@ -432,7 +441,7 @@ void UniSequence::RemoveFromSeq(CFlightPlan fp)
 	log("Removing from local sequence");
 	for (auto& ac : sequence)
 	{
-		if (ac.fp.GetCallsign() == fp.GetCallsign())
+		if (ac.callsign == fp.GetCallsign())
 		{
 			ac.status = AIRCRAFT_STATUS_NULL;
 			return;
@@ -478,7 +487,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		AddPopupListElement(SEQUENCE_TAGFUNC_REORDER_TOPKEY, "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
 		for (auto& aircraft : sequence)
 		{
-			if (aircraft.status == thisAc->status) AddPopupListElement(aircraft.fp.GetCallsign(), "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
+			if (aircraft.status == thisAc->status && aircraft.callsign != thisAc->callsign) AddPopupListElement(aircraft.callsign.c_str(), "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
 		}
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:

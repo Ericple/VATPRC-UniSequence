@@ -14,7 +14,7 @@ using namespace EuroScopePlugIn;
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "v1.1.1"
+#define PLUGIN_VER "v1.1.2"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif
@@ -24,7 +24,7 @@ using namespace EuroScopePlugIn;
 #define SEQUENCE_TAGITEM_TYPE_CODE_NAME "Sequence / Status"
 #define SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE 50
 #define SEQUENCE_TAGFUNC_SWITCH_STATUS "Status Popup List"
-#define SEQUENCE_TAGFUNC_REORDER_TOPKEY "To the top"
+#define SEQUENCE_TAGFUNC_REORDER_TOPKEY "To the moon"
 #define SEQUENCE_TAGITEM_FUNC_REORDER 82
 #define SEQUENCE_TAGFUNC_REORDER_INPUT "Reorder Input"
 #define SEQUENCE_TAGITEM_FUNC_REORDER_EDITED 94
@@ -102,7 +102,7 @@ using namespace EuroScopePlugIn;
 #endif // !LOGGER_RELATED
 
 typedef struct SequenceNode {
-	EuroScopePlugIn::CFlightPlan fp;
+	string callsign, origin;
 	int status, sequenceNumber;
 	bool seqNumUpdated;
 } SeqN;
@@ -135,6 +135,7 @@ public:
 	void SyncSeqNum(string, int);
 	void RemoveFromSeq(CFlightPlan);
 	void RemoveFromSeq(string);
+	//void DeleteFromSeq(string);
 	void ClearUpdateFlag(string);
 	SeqN* GetSeqN(CFlightPlan);
 	void PushToSeq(CFlightPlan);

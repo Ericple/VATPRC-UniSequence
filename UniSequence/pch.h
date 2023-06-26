@@ -31,6 +31,7 @@ typedef websocketpp::client<websocketpp::config::asio_client> client;
 #include <list>
 #include <vector>
 #include <thread>
+#include <regex>
 
 
 

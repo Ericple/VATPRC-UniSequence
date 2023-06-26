@@ -36,7 +36,9 @@ void connection_metadata::on_message(websocketpp::connection_hdl, client::messag
 	if (msg->get_opcode() == websocketpp::frame::opcode::text)
 	{
 		string resBody = msg->get_payload().c_str();
-		nlohmann::json ws_data_json = nlohmann::json::parse(resBody);
+		uniptr->setQueueJson(icao, "{\"data\":" + resBody + "}");
+		//uniptr->Update_s_queueCache("{\"data\":"+resBody+"}");
+		/*nlohmann::json ws_data_json = nlohmann::json::parse(resBody);
 		int seqNum = 1;
 		try
 		{
@@ -53,7 +55,7 @@ void connection_metadata::on_message(websocketpp::connection_hdl, client::messag
 		catch (exception const& e)
 		{
 			uniptr->Messager(e.what());
-		}
+		}*/
 	}
 }
 

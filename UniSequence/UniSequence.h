@@ -14,7 +14,7 @@ using namespace EuroScopePlugIn;
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "v1.1.2"
+#define PLUGIN_VER "v2.0.0"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif
@@ -124,28 +124,23 @@ public:
 	void Messager(string);
 	vector<string> airportList;
 	vector<asoc> socketList;
-	vector<SeqN> sequence;
 	// log related
 	void endLog();
 	ofstream logStream;
 	ifstream wsReadStream;
 	void log(string);
 	string activeWsSyncString;
-	void SyncSeq(string, int);
-	void SyncSeqNum(string, int);
-	void RemoveFromSeq(CFlightPlan);
-	void RemoveFromSeq(string);
-	//void DeleteFromSeq(string);
-	void ClearUpdateFlag(string);
-	SeqN* GetSeqN(CFlightPlan);
-	void PushToSeq(CFlightPlan);
 	void CheckApEnabled(string);
 	void PatchStatus(CFlightPlan, int);
-	mutex sequenceLock;
-	mutex seqremovelock;
-	mutex loglock;
+	SeqN* GetFromList(CFlightPlan);
+	void setQueueJson(string, string);
+	void UpdateBox();
 private:
+	mutex loglock;
+	bool showUpdateBox = true;
+	mutex j_queueLock;
 	thread* updateCheckThread;
+	nlohmann::json j_queueCaches;
 #ifdef USE_WEBSOCKET
 	thread* wsSyncThread;
 #else

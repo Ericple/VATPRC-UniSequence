@@ -21,83 +21,9 @@ void UniSequence::endLog()
 	if(logStream.is_open()) logStream.close();
 }
 
-//void UniSequence::DeleteFromSeq(string callsign)
-//{
-//	lock_guard<mutex> guard(sequenceLock);
-//	log("Delete " + callsign + " from local queue");
-//	int offset = 0;
-//	for (auto& seqNode : sequence)
-//	{
-//		if(!seqNode.fp.IsValid())
-//	}
-//}
-
-void UniSequence::SyncSeq(string callsign, int status)
+void UniSequence::UpdateBox()
 {
-	lock_guard<mutex> guard(sequenceLock);
-	log("Synchronizing sequence status for " + callsign);
-	for (auto& seqN : sequence)
-	{
-		if (seqN.callsign == callsign)
-		{
-			seqN.status = status;
-			seqN.seqNumUpdated = true;
-			log("Sync complete.");
-			return;
-		}
-	}
-	return;
-}
-
-// This function is not allowed to be called in non threads, otherwise it may cause access conflicts
-void UniSequence::ClearUpdateFlag(string airport)
-{
-	lock_guard<mutex> guard(seqremovelock);
-	CController ctr = ControllerMyself();
-	// If the unit does not exist remotely, remove it from the local list
-	for (auto& seqN : sequence)
-	{
-		if (!seqN.seqNumUpdated && airport == seqN.origin)
-		{
-			RemoveFromSeq(seqN.callsign);
-		}
-		else
-		{
-			seqN.seqNumUpdated = false;
-		}
-	}
-	FlightPlanSelect("a");
-}
-
-void UniSequence::SyncSeqNum(string callsign, int seqNum)
-{
-	lock_guard<mutex> guard(sequenceLock);
-	log("Synchronizing sequence number for " + callsign);
-	for (auto& seqN : sequence)
-	{
-		if (seqN.callsign == callsign)
-		{
-			seqN.sequenceNumber = seqNum;
-			log("Sync complete.");
-			seqN.seqNumUpdated = true;
-			return;
-		}
-	}
-	
-	return;
-}
-
-void UniSequence::RemoveFromSeq(string callsign)
-{
-	lock_guard<mutex> guard(sequenceLock);
-	for (auto& seqN : sequence)
-	{
-		if (seqN.callsign == callsign)
-		{
-			seqN.status = AIRCRAFT_STATUS_NULL;
-			return;
-		}
-	}
+	MessageBox(NULL, L"UniSequence 插件新版本已发布，请及时更新以获得稳定体验。", L"更新可用", MB_OK);
 }
 
 UniSequence::UniSequence(void) : CPlugIn(
@@ -231,6 +157,11 @@ UniSequence::UniSequence(void) : CPlugIn(
 				string publishDate = versionInfo[0]["created_at"];
 				if (versionTag != PLUGIN_VER)
 				{
+					if (showUpdateBox)
+					{
+						UpdateBox();
+						showUpdateBox = false;
+					}
 					Messager("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
 				}
 				// Now, an update prompt will only appear when and only when there is an update, without indicating that this plugin is the latest version
@@ -261,20 +192,10 @@ void UniSequence::Messager(string message)
 	log(message);
 }
 
-SeqN* UniSequence::GetSeqN(CFlightPlan fp)
-{
-	string cs = fp.GetCallsign();
-	for (auto& node : sequence)
-	{
-		if (node.callsign == fp.GetCallsign()) return &node;
-	}
-	log("There's no sequence node for " + cs + ", returning nullptr");
-	return (SeqN*)nullptr;
-}
-
 bool UniSequence::OnCompileCommand(const char* sCommandLine)
 {
 	string cmd = sCommandLine;
+	std::regex unisRegex(".");
 	log("Command received: " + cmd);
 	// transform cmd to uppercase in order for identify
 	transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
@@ -327,15 +248,6 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 		Messager(i);
 		return true;
 	}
-	if (cmd.substr(0, 4) == ".SQS")
-	{
-		log("command \".SQS\" acknowledged.");
-		char i[10];
-		_itoa_s(sequence.size(), i, 10);
-		Messager("Current in sequence:");
-		Messager(i);
-		return true;
-	}
 	if (cmd.substr(0, 4) == ".SQC")
 	{
 		log("command \".SQC\" acknowledged.");
@@ -371,19 +283,6 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 	return false;
 }
 
-void UniSequence::PushToSeq(CFlightPlan fp)
-{
-	lock_guard<mutex> guard(sequenceLock);
-	string cs = fp.GetCallsign();
-	string orig = fp.GetFlightPlanData().GetOrigin();
-	log("Initializing an new pointer for Sequence Node instance for " + cs);
-	SeqN seqN = *new SeqN{ cs, orig, AIRCRAFT_STATUS_NULL, false };
-	log("Pushing an new instance to local sequence vector.");
-	sequence.push_back(seqN);
-	
-	return;
-}
-
 void UniSequence::PatchStatus(CFlightPlan fp, int status)
 {
 	string cs = fp.GetCallsign();
@@ -408,16 +307,7 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 		{
 			if (result->status == 200)
 			{
-				SyncSeq(fp.GetCallsign(), status);
-				json resObj = json::parse(result->body);
-				int seqNumber = 1;
-				for (auto& seqObj : resObj["data"])
-				{
-					SyncSeq(seqObj[JSON_KEY_CALLSIGN], seqObj[JSON_KEY_STATUS]);
-					SyncSeqNum(seqObj[JSON_KEY_CALLSIGN], seqNumber);
-					seqNumber++;
-				}
-				ClearUpdateFlag(ap);
+				setQueueJson(ap, result->body);
 			}
 			else
 			{
@@ -435,34 +325,40 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 	patchThread.detach();
 }
 
-void UniSequence::RemoveFromSeq(CFlightPlan fp)
+void UniSequence::setQueueJson(string airport, string content)
 {
-	lock_guard<mutex> guard(sequenceLock);
-	log("Removing from local sequence");
-	for (auto& ac : sequence)
-	{
-		if (ac.callsign == fp.GetCallsign())
-		{
-			ac.status = AIRCRAFT_STATUS_NULL;
-			return;
-		}
-	}
-	log("not in local sequence, nothing happend.");
-	
-	return;
+	lock_guard<mutex> guard(j_queueLock);
+	j_queueCaches[airport] = json::parse(content)["data"];
 }
 
+SeqN* UniSequence::GetFromList(CFlightPlan fp)
+{
+	int seqNum = 1;
+	int status = AIRCRAFT_STATUS_NULL;
+	string airport = fp.GetFlightPlanData().GetOrigin();
+	json list = j_queueCaches[airport];
+	for (auto& node : list)
+	{
+		if (node["callsign"] == fp.GetCallsign())
+		{
+			status = node["status"];
+			return new SeqN{node["callsign"], fp.GetFlightPlanData().GetOrigin(), status, seqNum, false};
+		}
+		seqNum++;
+	}
+	return nullptr;
+}
 void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area)
 {
 	log("Function called by EuroScope, function id: " + fId + *"param: " + *sItemString);
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
-	SeqN* thisAc = GetSeqN(fp);
-	// return if nullptr
-	if (!thisAc) return;
+	SeqN* thisAc = GetFromList(fp);
+	string ap = fp.GetFlightPlanData().GetOrigin();
 	string beforeKey;
 	thread* reOrderThread;
+	json list = j_queueCaches[ap];
 	switch (fId)
 	{
 	case SEQUENCE_TAGITEM_FUNC_REORDER:
@@ -482,15 +378,18 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		AddPopupListElement(STATUS_DESC_TKOF, "", FUNC_SWITCH_TO_TOGA);
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_SELECT:
+		if (!thisAc) return;
 		if (thisAc->status == AIRCRAFT_STATUS_NULL) return;
 		OpenPopupList(area, "PUT BEFORE", 2);
 		AddPopupListElement(SEQUENCE_TAGFUNC_REORDER_TOPKEY, "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
-		for (auto& aircraft : sequence)
+		for (auto& aircraft : list)
 		{
-			if (aircraft.status == thisAc->status && aircraft.callsign != thisAc->callsign) AddPopupListElement(aircraft.callsign.c_str(), "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
+			string cs = aircraft["callsign"];
+			if (aircraft["status"] == thisAc->status && cs != thisAc->callsign) AddPopupListElement(cs.c_str(), "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
 		}
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:
+		if (!thisAc) return;
 		log("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
 		logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 #ifdef PATCH_WITH_LOGON_CODE
@@ -521,16 +420,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 			{
 				if (res->status == 200)
 				{
-					json resObj = json::parse(res->body);
-					int seqNumber = 1;
-					for (auto& seqObj : resObj["data"])
-					{
-						SyncSeq(seqObj["callsign"], seqObj["status"]);
-						SyncSeqNum(seqObj["callsign"], seqNumber);
-						seqNumber++;
-					}
-
-					ClearUpdateFlag(ap);
+					setQueueJson(ap, res->body);
 				}
 			}
 			else
@@ -601,16 +491,24 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;
 	// remove aircraft if it's taking off
 	if (rt.GetGS() > 50) return;
-	// automatically check if the departure airport of this fp is in the airport list
+	// check if the departure airport of this fp is in the airport list
 	string depAirport = fp.GetFlightPlanData().GetOrigin();
 	CheckApEnabled(depAirport);
-	SeqN* node = GetSeqN(fp);
-	if (!node) PushToSeq(fp); // if is nullptr, push an new object to sequence
-	SeqN* ac = GetSeqN(fp);
-	int status = ac->status; // recapture the fp we just added
-	int seqNum = ac->sequenceNumber;
+	int seqNum = 1;
+	int status = AIRCRAFT_STATUS_NULL;
+	json list = j_queueCaches[depAirport];
+	bool seqadd = true;
+	for (auto& node : list)
+	{
+		if (node["callsign"] == fp.GetCallsign())
+		{
+			status = node["status"];
+			seqadd = false;
+		}
+		if (seqadd) seqNum++;
+	}
 	// you won't want to say "Your sequence number is one hundred and fivty nine" :D
-	if (ac->sequenceNumber > 99) seqNum = 99;
+	if (seqNum > 99) seqNum = 99;
 	int bufferSize = strlen(STATUS_TEXT_PLACE_HOLDER) + 1;
 	switch (status)
 	{

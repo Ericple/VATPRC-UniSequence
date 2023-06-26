@@ -14,7 +14,7 @@ using namespace EuroScopePlugIn;
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "v1.1.4"
+#define PLUGIN_VER "v2.0.0"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif
@@ -134,15 +134,13 @@ public:
 	void PatchStatus(CFlightPlan, int);
 	SeqN* GetFromList(CFlightPlan);
 	void setQueueJson(string, string);
+	void UpdateBox();
 private:
-	mutex sequenceLock;
-	mutex seqremovelock;
 	mutex loglock;
+	bool showUpdateBox = true;
 	mutex j_queueLock;
 	thread* updateCheckThread;
 	nlohmann::json j_queueCaches;
-	//string s_queueCache = R"({"data":[]})";
-	//mutex l_s_queueCache;
 #ifdef USE_WEBSOCKET
 	thread* wsSyncThread;
 #else

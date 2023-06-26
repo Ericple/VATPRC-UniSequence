@@ -7,6 +7,7 @@
 
 #include "framework.h"
 #include <iostream>
+#include <WinUser.h>
 #ifdef USE_WEBSOCKET
 #include "websocketpp/config/asio_no_tls_client.hpp"
 #include "websocketpp/client.hpp"

@@ -21,6 +21,11 @@ void UniSequence::endLog()
 	if(logStream.is_open()) logStream.close();
 }
 
+void UniSequence::UpdateBox()
+{
+	MessageBox(NULL, L"UniSequence 插件新版本已发布，请及时更新以获得稳定体验。", L"更新可用", MB_OK);
+}
+
 UniSequence::UniSequence(void) : CPlugIn(
 	EuroScopePlugIn::COMPATIBILITY_CODE,
 	PLUGIN_NAME, PLUGIN_VER, PLUGIN_AUTHOR, PLUGIN_COPYRIGHT
@@ -152,6 +157,11 @@ UniSequence::UniSequence(void) : CPlugIn(
 				string publishDate = versionInfo[0]["created_at"];
 				if (versionTag != PLUGIN_VER)
 				{
+					if (showUpdateBox)
+					{
+						UpdateBox();
+						showUpdateBox = false;
+					}
 					Messager("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
 				}
 				// Now, an update prompt will only appear when and only when there is an update, without indicating that this plugin is the latest version

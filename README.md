@@ -1,11 +1,14 @@
-# UniSequence
+<p align="center">
+<img src="https://peercat.cn/unifsd/icon.svg" width=120/>
+</p>
+<h1 align="center">unisequence</h1>
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Ericple/VATPRC-UniSequence/msbuild.yml?style=flat-square)
-![GitHub Repo stars](https://img.shields.io/github/stars/Ericple/VATPRC-UniSequence?style=social)
-![GitHub](https://img.shields.io/github/license/Ericple/VATPRC-UniSequence?style=flat-square)
-![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/Ericple/VATPRC-UniSequence?display_name=tag&include_prereleases&style=flat-square)
-
-# INTRODUCTION
+<p align="center">
+  <img src="https://img.shields.io/github/actions/workflow/status/Ericple/VATPRC-UniSequence/msbuild.yml?style=flat-square" />
+  <img src="https://img.shields.io/github/license/Ericple/VATPRC-UniSequence?style=flat-square" />
+  <img src="https://img.shields.io/github/v/release/Ericple/VATPRC-UniSequence?display_name=tag&include_prereleases&style=flat-square" />
+  <img src="https://img.shields.io/github/stars/Ericple/VATPRC-UniSequence?style=social" />
+</p>
 
 ## What
 

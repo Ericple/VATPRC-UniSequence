@@ -48,7 +48,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 		{
 			for (auto& airport : airportList)
 			{
-				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport };
+				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
 				if (std::find_if(socketList.begin(), socketList.end(), airport_socket) == socketList.end())
 				{
 					int id = endpoint.connect(WS_ADDRESS_PRC + restfulVer + airport + "/ws", airport);
@@ -66,7 +66,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 			// Delete airports that no longer exist in the local airport list
 			for (auto& socket : socketList)
 			{
-				const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport };
+				const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport; };
 				if (std::find_if(airportList.begin(), airportList.end(), airport_socket) == airportList.end()) {
 					endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
 				}
@@ -76,7 +76,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 				std::remove_if(
 					socketList.begin(),
 					socketList.end(),
-					[](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
+					[&](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
 				),
 				socketList.end()
 			);

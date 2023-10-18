@@ -48,15 +48,8 @@ UniSequence::UniSequence(void) : CPlugIn(
 		{
 			for (auto& airport : airportList)
 			{
-				bool socketexist = false;
-				for (auto& socket : socketList)
-				{
-					if (socket.icao == airport)
-					{
-						socketexist = true;
-					}
-				}
-				if (!socketexist)
+				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport };
+				if (std::find_if(socketList.begin(), socketList.end(), airport_socket) == socketList.end())
 				{
 					int id = endpoint.connect(WS_ADDRESS_PRC + restfulVer + airport + "/ws", airport);
 					if (id >= 0)
@@ -73,26 +66,20 @@ UniSequence::UniSequence(void) : CPlugIn(
 			// Delete airports that no longer exist in the local airport list
 			for (auto& socket : socketList)
 			{
-				bool apexist = false;
-				for (auto& airport : airportList)
-				{
-					if (airport == socket.icao) 
-					{
-						apexist = true;
-					}
+				const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport };
+				if (std::find_if(airportList.begin(), airportList.end(), airport_socket) == airportList.end()) {
+					endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
 				}
-				if (!apexist) endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
 			}
 			// If there is a disconnection in ws, remove this socket from the list directly.
-			int socketoffset = 0;
-			for (auto& socket : socketList)
-			{
-				if (endpoint.get_metadata(socket.socketId).get()->get_status() == "")
-				{
-					socketList.erase(socketList.begin() + socketoffset);
-				}
-				socketoffset++;
-			}
+			socketList.erase(
+				std::remove_if(
+					socketList.begin(),
+					socketList.end(),
+					[](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
+				),
+				socketList.end()
+			);
 			this_thread::sleep_for(chrono::seconds(5));
 		}
 		});

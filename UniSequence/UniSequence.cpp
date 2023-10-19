@@ -7,11 +7,11 @@ using nlohmann::json;
 
 void UniSequence::log(string message)
 {
-	lock_guard<mutex> guard(loglock);
-	SYSTEMTIME sysTime = { 0 };
-	GetSystemTime(&sysTime);
-	if (!logStream.is_open()) logStream.open(LOG_FILE_NAME, ios::app);
-	logStream << "[" << sysTime.wHour << ":" << sysTime.wMinute << ":" << sysTime.wSecond << "] " << message << endl;
+	std::lock_guard<std::mutex> guard(loglock);
+	if (!logStream.is_open()) {
+		logStream.open(LOG_FILE_NAME, ios::app);
+	}
+	logStream << std::format("[{:%T}] {}", std::chrono::system_clock::now(), message) << std::endl;
 	logStream.close();
 }
 
@@ -337,7 +337,7 @@ SeqN* UniSequence::GetFromList(CFlightPlan fp)
 }
 void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area)
 {
-	log("Function called by EuroScope, function id: " + fId + *"param: " + *sItemString);
+	log(std::format("Function (ID: {}) is called by EuroScope, param: {}", fId, sItemString));
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
@@ -455,18 +455,16 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	}
 }
 
-void UniSequence::CheckApEnabled(string depAirport)
+auto UniSequence::AddAirportIfNotExist(const string& dep_airport) -> void
 {
-	for (auto& airport : airportList)
-	{
-		if (airport == depAirport)
-		{
-			return;
-		}
+	const auto& is_same_airport = [&](auto& airport) { 
+		return airport == dep_airport;
+	};
+	if (std::find_if(airportList.cbegin(), airportList.cend(), is_same_airport) == airportList.cend()) {
+		log(std::format("Airport {} is not in the list.", dep_airport));
+		airportList.push_back(dep_airport);
+		log(std::format("Airport {} added.", dep_airport));
 	}
-	log("Airport not in list, adding");
-	airportList.push_back(depAirport);
-	log("Airport added.");
 }
 
 void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, int tagData,
@@ -480,7 +478,7 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	if (rt.GetGS() > 50) return;
 	// check if the departure airport of this fp is in the airport list
 	string depAirport = fp.GetFlightPlanData().GetOrigin();
-	CheckApEnabled(depAirport);
+	AddAirportIfNotExist(depAirport);
 	int seqNum = 1;
 	int status = AIRCRAFT_STATUS_NULL;
 	json list = j_queueCaches[depAirport];

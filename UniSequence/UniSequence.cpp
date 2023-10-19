@@ -7,11 +7,11 @@ using nlohmann::json;
 
 void UniSequence::log(string message)
 {
-	lock_guard<mutex> guard(loglock);
-	SYSTEMTIME sysTime = { 0 };
-	GetSystemTime(&sysTime);
-	if (!logStream.is_open()) logStream.open(LOG_FILE_NAME, ios::app);
-	logStream << "[" << sysTime.wHour << ":" << sysTime.wMinute << ":" << sysTime.wSecond << "] " << message << endl;
+	std::lock_guard<std::mutex> guard(loglock);
+	if (!logStream.is_open()) {
+		logStream.open(LOG_FILE_NAME, ios::app);
+	}
+	logStream << std::format("[{:%T}] {}", std::chrono::system_clock::now(), message) << std::endl;
 	logStream.close();
 }
 

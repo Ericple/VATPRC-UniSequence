@@ -7,11 +7,11 @@ using nlohmann::json;
 
 void UniSequence::log(string message)
 {
-	lock_guard<mutex> guard(loglock);
-	SYSTEMTIME sysTime = { 0 };
-	GetSystemTime(&sysTime);
-	if (!logStream.is_open()) logStream.open(LOG_FILE_NAME, ios::app);
-	logStream << "[" << sysTime.wHour << ":" << sysTime.wMinute << ":" << sysTime.wSecond << "] " << message << endl;
+	std::lock_guard<std::mutex> guard(loglock);
+	if (!logStream.is_open()) {
+		logStream.open(LOG_FILE_NAME, ios::app);
+	}
+	logStream << std::format("[{:%T}] {}", std::chrono::system_clock::now(), message) << std::endl;
 	logStream.close();
 }
 
@@ -23,7 +23,7 @@ void UniSequence::endLog()
 
 void UniSequence::UpdateBox()
 {
-	MessageBox(NULL, L"UniSequence 插件新版本已发布，请及时更新以获得稳定体验。", L"更新可用", MB_OK);
+	//MessageBox(NULL, "UniSequence 插件新版本已发布，请及时更新以获得稳定体验。", "更新可用", MB_OK);
 }
 
 UniSequence::UniSequence(void) : CPlugIn(
@@ -48,15 +48,8 @@ UniSequence::UniSequence(void) : CPlugIn(
 		{
 			for (auto& airport : airportList)
 			{
-				bool socketexist = false;
-				for (auto& socket : socketList)
-				{
-					if (socket.icao == airport)
-					{
-						socketexist = true;
-					}
-				}
-				if (!socketexist)
+				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
+				if (std::find_if(socketList.begin(), socketList.end(), airport_socket) == socketList.end())
 				{
 					int id = endpoint.connect(WS_ADDRESS_PRC + restfulVer + airport + "/ws", airport);
 					if (id >= 0)
@@ -73,26 +66,20 @@ UniSequence::UniSequence(void) : CPlugIn(
 			// Delete airports that no longer exist in the local airport list
 			for (auto& socket : socketList)
 			{
-				bool apexist = false;
-				for (auto& airport : airportList)
-				{
-					if (airport == socket.icao) 
-					{
-						apexist = true;
-					}
+				const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport; };
+				if (std::find_if(airportList.begin(), airportList.end(), airport_socket) == airportList.end()) {
+					endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
 				}
-				if (!apexist) endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
 			}
 			// If there is a disconnection in ws, remove this socket from the list directly.
-			int socketoffset = 0;
-			for (auto& socket : socketList)
-			{
-				if (endpoint.get_metadata(socket.socketId).get()->get_status() == "")
-				{
-					socketList.erase(socketList.begin() + socketoffset);
-				}
-				socketoffset++;
-			}
+			socketList.erase(
+				std::remove_if(
+					socketList.begin(),
+					socketList.end(),
+					[&](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
+				),
+				socketList.end()
+			);
 			this_thread::sleep_for(chrono::seconds(5));
 		}
 		});
@@ -350,7 +337,7 @@ SeqN* UniSequence::GetFromList(CFlightPlan fp)
 }
 void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area)
 {
-	log("Function called by EuroScope, function id: " + fId + *"param: " + *sItemString);
+	log(std::format("Function (ID: {}) is called by EuroScope, param: {}", fId, sItemString));
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
@@ -468,18 +455,16 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	}
 }
 
-void UniSequence::CheckApEnabled(string depAirport)
+auto UniSequence::AddAirportIfNotExist(const string& dep_airport) -> void
 {
-	for (auto& airport : airportList)
-	{
-		if (airport == depAirport)
-		{
-			return;
-		}
+	const auto& is_same_airport = [&](auto& airport) { 
+		return airport == dep_airport;
+	};
+	if (std::find_if(airportList.cbegin(), airportList.cend(), is_same_airport) == airportList.cend()) {
+		log(std::format("Airport {} is not in the list.", dep_airport));
+		airportList.push_back(dep_airport);
+		log(std::format("Airport {} added.", dep_airport));
 	}
-	log("Airport not in list, adding");
-	airportList.push_back(depAirport);
-	log("Airport added.");
 }
 
 void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, int tagData,
@@ -493,7 +478,7 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	if (rt.GetGS() > 50) return;
 	// check if the departure airport of this fp is in the airport list
 	string depAirport = fp.GetFlightPlanData().GetOrigin();
-	CheckApEnabled(depAirport);
+	AddAirportIfNotExist(depAirport);
 	int seqNum = 1;
 	int status = AIRCRAFT_STATUS_NULL;
 	json list = j_queueCaches[depAirport];

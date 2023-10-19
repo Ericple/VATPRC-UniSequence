@@ -130,7 +130,6 @@ public:
 	ifstream wsReadStream;
 	void log(string);
 	string activeWsSyncString;
-	void CheckApEnabled(string);
 	void PatchStatus(CFlightPlan, int);
 	SeqN* GetFromList(CFlightPlan);
 	void setQueueJson(string, string);
@@ -149,5 +148,7 @@ private:
 	bool syncThreadFlag = true, updateCheckFlag = true;
 	const char* logonCode;
 	int timerInterval = 5;
+
+	auto AddAirportIfNotExist(const string&) -> void;
 };
 

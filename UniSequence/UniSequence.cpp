@@ -337,7 +337,7 @@ SeqN* UniSequence::GetFromList(CFlightPlan fp)
 }
 void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area)
 {
-	log("Function called by EuroScope, function id: " + fId + *"param: " + *sItemString);
+	log(std::format("Function (ID: {}) is called by EuroScope, param: {}", fId, sItemString));
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;

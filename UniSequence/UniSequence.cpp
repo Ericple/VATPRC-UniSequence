@@ -134,33 +134,34 @@ UniSequence::UniSequence(void) : CPlugIn(
 		httplib::Client updateReq(GITHUB_UPDATE);
 		updateReq.set_connection_timeout(10, 0);
 		Messager("Start updates check routine.");
-		while (updateCheckFlag)
-		{
-			if (auto result = updateReq.Get(GITHUB_UPDATE_PATH))
-			{
+		if (updateCheckFlag) {
+			if (auto result = updateReq.Get(GITHUB_UPDATE_PATH)) {
 				json versionInfo = json::parse(result->body);
+				if (versionInfo.contains("message")) {
+					Messager("Error occured while checking updates.");
+					Messager(versionInfo["message"]);
+					return;
+				}
+				if (!versionInfo.is_array()) {
+					Messager("Error occured while checking updates.");
+					return;
+				}
 				string versionTag = versionInfo[0]["tag_name"];
 				string versionName = versionInfo[0]["name"];
 				string publishDate = versionInfo[0]["created_at"];
-				if (versionTag != PLUGIN_VER)
-				{
-					if (showUpdateBox)
-					{
+				if (versionTag != PLUGIN_VER) {
+					if (showUpdateBox) {
 						UpdateBox();
 						showUpdateBox = false;
 					}
 					Messager("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
 				}
 				// Now, an update prompt will only appear when and only when there is an update, without indicating that this plugin is the latest version
-			}
-			else
-			{
+			} else {
 				Messager("Error occured while checking updates - "+httplib::to_string(result.error()));
 			}
-			// Check for updates every 15 minutes.
-			this_thread::sleep_for(chrono::minutes(15));
 		}
-		});
+	});
 	updateCheckThread->detach();
 
 	Messager("Initialization complete.");

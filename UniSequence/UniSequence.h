@@ -14,7 +14,7 @@ using namespace EuroScopePlugIn;
 #define SERVER_RESTFUL_VER "/v1/"
 #define DIVISION "VATPRC"
 #define PLUGIN_NAME "UniSequence"
-#define PLUGIN_VER "v2.0.0"
+#define PLUGIN_VER "v2.0.3"
 #define PLUGIN_AUTHOR "Ericple Garrison"
 #define PLUGIN_COPYRIGHT "AGPL-3.0 license"
 #endif

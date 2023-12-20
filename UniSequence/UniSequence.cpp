@@ -2,14 +2,13 @@
 #include "UniSequence.h"
 #include "websocket_endpoint.h"
 
-using namespace std;
 using nlohmann::json;
 
-void UniSequence::log(string message)
+void UniSequence::log(std::string message)
 {
 	std::lock_guard<std::mutex> guard(loglock);
 	if (!logStream.is_open()) {
-		logStream.open(LOG_FILE_NAME, ios::app);
+		logStream.open(LOG_FILE_NAME, std::ios::app);
 	}
 	logStream << std::format("[{:%T}] {}", std::chrono::system_clock::now(), message) << std::endl;
 	logStream.close();
@@ -41,9 +40,9 @@ UniSequence::UniSequence(void) : CPlugIn(
 	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_INPUT, SEQUENCE_TAGITEM_FUNC_REORDER);
 	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_SELECT, SEQUENCE_TAGITEM_FUNC_REORDER_SELECT);
 #ifdef USE_WEBSOCKET
-	wsSyncThread = new thread([&] {
+	wsSyncThread = new std::thread([&] {
 		websocket_endpoint endpoint(this);
-		string restfulVer = SERVER_RESTFUL_VER;
+		std::string restfulVer = SERVER_RESTFUL_VER;
 		while (syncThreadFlag)
 		{
 			for (auto& airport : airportList)
@@ -80,7 +79,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 				),
 				socketList.end()
 			);
-			this_thread::sleep_for(chrono::seconds(5));
+			std::this_thread::sleep_for(std::chrono::seconds(5));
 		}
 		});
 	wsSyncThread->detach();
@@ -130,7 +129,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 	dataSyncThread->detach();
 #endif // USE_WEBSOCKET
 	// update check thread has been detached, so it's safe
-	updateCheckThread = new thread([&] {
+	updateCheckThread = new std::thread([&] {
 		httplib::Client updateReq(GITHUB_UPDATE);
 		updateReq.set_connection_timeout(10, 0);
 		Messager("Start updates check routine.");
@@ -146,9 +145,9 @@ UniSequence::UniSequence(void) : CPlugIn(
 					Messager("Error occured while checking updates.");
 					return;
 				}
-				string versionTag = versionInfo[0]["tag_name"];
-				string versionName = versionInfo[0]["name"];
-				string publishDate = versionInfo[0]["created_at"];
+				std::string versionTag = versionInfo[0]["tag_name"];
+				std::string versionName = versionInfo[0]["name"];
+				std::string publishDate = versionInfo[0]["created_at"];
 				if (versionTag != PLUGIN_VER) {
 					if (showUpdateBox) {
 						UpdateBox();
@@ -173,7 +172,7 @@ UniSequence::~UniSequence(void)
 	updateCheckFlag = false;
 }
 
-void UniSequence::Messager(string message)
+void UniSequence::Messager(std::string message)
 {
 	DisplayUserMessage("UniSequence", "system", message.c_str(),
 		false, true, true, true, true);
@@ -182,7 +181,7 @@ void UniSequence::Messager(string message)
 
 bool UniSequence::OnCompileCommand(const char* sCommandLine)
 {
-	string cmd = sCommandLine;
+	std::string cmd = sCommandLine;
 	std::regex unisRegex(".");
 	log("Command received: " + cmd);
 	// transform cmd to uppercase in order for identify
@@ -203,9 +202,9 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 		try
 		{
 			log("Spliting cmd");
-			stringstream ss(cmd);
+			std::stringstream ss(cmd);
 			char delim = ' ';
-			string item;
+			std::string item;
 			log("Clearing airport list");
 			airportList.clear();
 			log("Airport list cleared");
@@ -221,7 +220,7 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 			if (airportList.size() == 1) Messager("Airport saved.");
 			if (airportList.size() < 1) Messager("Airport cleared.");
 		}
-		catch (runtime_error const& e)
+		catch (std::runtime_error const& e)
 		{
 			Messager("Error: " + *e.what());
 		}
@@ -242,9 +241,9 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 		try
 		{
 			log("Spliting cmd");
-			stringstream ss(cmd);
+			std::stringstream ss(cmd);
 			char delim = ' ';
-			string item;
+			std::string item;
 			log("Clearing airport list");
 			airportList.clear();
 			log("Airport list cleared");
@@ -253,7 +252,7 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
 				{
 					log("Saving logon code: " + item + " to settings");
-					string lowercode = item.c_str();
+					std::string lowercode = item.c_str();
 					transform(lowercode.begin(), lowercode.end(), lowercode.begin(), ::tolower);
 					SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, lowercode.c_str());
 					log("Logon code saved.");
@@ -261,7 +260,7 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 			}
 			Messager(MSG_LOGON_CODE_SAVED);
 		}
-		catch (runtime_error const& e)
+		catch (std::runtime_error const& e)
 		{
 			Messager("Error: " + *e.what());
 		}
@@ -273,7 +272,7 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 
 void UniSequence::PatchStatus(CFlightPlan fp, int status)
 {
-	string cs = fp.GetCallsign();
+	std::string cs = fp.GetCallsign();
 	log("Attempting to patch status of " + cs);
 	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 #ifdef PATCH_WITH_LOGON_CODE
@@ -283,14 +282,14 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 		return;
 	}
 #endif // PATCH_WITH_LOGON_CODE
-	thread patchThread([fp, status, this] {
+	std::thread patchThread([fp, status, this] {
 		json reqBody = {
 			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
 			{JSON_KEY_STATUS, status}
 		};
 		httplib::Client patchReq(SERVER_ADDRESS_PRC);
 		patchReq.set_connection_timeout(10, 0);
-		string ap = fp.GetFlightPlanData().GetOrigin();
+		std::string ap = fp.GetFlightPlanData().GetOrigin();
 		if (auto result = patchReq.Patch(SERVER_RESTFUL_VER + ap + "/status", {{HEADER_LOGON_KEY, logonCode}}, reqBody.dump().c_str(), "application/json"))
 		{
 			if (result->status == 200)
@@ -313,9 +312,9 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 	patchThread.detach();
 }
 
-void UniSequence::setQueueJson(string airport, string content)
+void UniSequence::setQueueJson(std::string airport, std::string content)
 {
-	lock_guard<mutex> guard(j_queueLock);
+	std::lock_guard<std::mutex> guard(j_queueLock);
 	j_queueCaches[airport] = json::parse(content)["data"];
 }
 
@@ -323,7 +322,7 @@ SeqN* UniSequence::GetFromList(CFlightPlan fp)
 {
 	int seqNum = 1;
 	int status = AIRCRAFT_STATUS_NULL;
-	string airport = fp.GetFlightPlanData().GetOrigin();
+	std::string airport = fp.GetFlightPlanData().GetOrigin();
 	json list = j_queueCaches[airport];
 	for (auto& node : list)
 	{
@@ -343,9 +342,9 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
 	SeqN* thisAc = GetFromList(fp);
-	string ap = fp.GetFlightPlanData().GetOrigin();
-	string beforeKey;
-	thread* reOrderThread;
+	std::string ap = fp.GetFlightPlanData().GetOrigin();
+	std::string beforeKey;
+	std::thread* reOrderThread;
 	json list = j_queueCaches[ap];
 	switch (fId)
 	{
@@ -372,7 +371,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		AddPopupListElement(SEQUENCE_TAGFUNC_REORDER_TOPKEY, "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
 		for (auto& aircraft : list)
 		{
-			string cs = aircraft["callsign"];
+			std::string cs = aircraft["callsign"];
 			if (aircraft["status"] == thisAc->status && cs != thisAc->callsign) AddPopupListElement(cs.c_str(), "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
 		}
 		break;
@@ -396,10 +395,10 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 			beforeKey = sItemString;
 		}
 		log("Creating an new thread for reorder request");
-		reOrderThread = new thread([beforeKey, fp, this] {
+		reOrderThread = new std::thread([beforeKey, fp, this] {
 			httplib::Client req(SERVER_ADDRESS_PRC);
 			req.set_connection_timeout(10, 0);
-			string ap = fp.GetFlightPlanData().GetOrigin();
+			std::string ap = fp.GetFlightPlanData().GetOrigin();
 			json reqBody = {
 				{JSON_KEY_CALLSIGN, fp.GetCallsign()},
 				{JSON_KEY_BEFORE, beforeKey}
@@ -456,7 +455,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	}
 }
 
-auto UniSequence::AddAirportIfNotExist(const string& dep_airport) -> void
+auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 {
 	const auto& is_same_airport = [&](auto& airport) { 
 		return airport == dep_airport;
@@ -478,7 +477,7 @@ void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	// remove aircraft if it's taking off
 	if (rt.GetGS() > 50) return;
 	// check if the departure airport of this fp is in the airport list
-	string depAirport = fp.GetFlightPlanData().GetOrigin();
+	std::string depAirport = fp.GetFlightPlanData().GetOrigin();
 	AddAirportIfNotExist(depAirport);
 	int seqNum = 1;
 	int status = AIRCRAFT_STATUS_NULL;

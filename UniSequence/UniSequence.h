@@ -1,6 +1,5 @@
 #pragma once
 
-using namespace std;
 using namespace EuroScopePlugIn;
 
 #ifndef COPYRIGHTS
@@ -102,13 +101,13 @@ using namespace EuroScopePlugIn;
 #endif // !LOGGER_RELATED
 
 typedef struct SequenceNode {
-	string callsign, origin;
+	std::string callsign, origin;
 	int status, sequenceNumber;
 	bool seqNumUpdated;
 } SeqN;
 
 typedef struct AirportSocket {
-	string icao;
+	std::string icao;
 	int socketId;
 } asoc;
 
@@ -121,27 +120,27 @@ public:
 	virtual void OnFunctionCall(int, const char*, POINT, RECT);
 	virtual void OnGetTagItem(CFlightPlan, CRadarTarget, 
 		int, int, char[16], int*, COLORREF*, double*);
-	void Messager(string);
-	vector<string> airportList;
-	vector<asoc> socketList;
+	void Messager(std::string);
+	std::vector<std::string> airportList;
+	std::vector<asoc> socketList;
 	// log related
 	void endLog();
-	ofstream logStream;
-	ifstream wsReadStream;
-	void log(string);
-	string activeWsSyncString;
+	std::ofstream logStream;
+	std::ifstream wsReadStream;
+	void log(std::string);
+	std::string activeWsSyncString;
 	void PatchStatus(CFlightPlan, int);
 	SeqN* GetFromList(CFlightPlan);
-	void setQueueJson(string, string);
+	void setQueueJson(std::string, std::string);
 	void UpdateBox();
 private:
-	mutex loglock;
+	std::mutex loglock;
 	bool showUpdateBox = true;
-	mutex j_queueLock;
-	thread* updateCheckThread;
+	std::mutex j_queueLock;
+	std::thread* updateCheckThread;
 	nlohmann::json j_queueCaches;
 #ifdef USE_WEBSOCKET
-	thread* wsSyncThread;
+	std::thread* wsSyncThread;
 #else
 	thread* dataSyncThread;
 #endif
@@ -149,6 +148,6 @@ private:
 	const char* logonCode;
 	int timerInterval = 5;
 
-	auto AddAirportIfNotExist(const string&) -> void;
+	auto AddAirportIfNotExist(const std::string&) -> void;
 };
 

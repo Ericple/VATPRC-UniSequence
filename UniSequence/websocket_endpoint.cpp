@@ -29,7 +29,7 @@ websocket_endpoint::~websocket_endpoint() {
     m_thread->join();
 }
 
-int websocket_endpoint::connect(std::string const& uri, string icao) {
+int websocket_endpoint::connect(std::string const& uri, std::string icao) {
     websocketpp::lib::error_code ec;
 
     client::connection_ptr con = m_endpoint.get_connection(uri, ec);

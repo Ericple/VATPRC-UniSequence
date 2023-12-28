@@ -4,7 +4,7 @@
 
 using nlohmann::json;
 
-void UniSequence::log(std::string message)
+void UniSequence::logToFile(std::string message)
 {
 	std::lock_guard<std::mutex> guard(loglock);
 	if (!logStream.is_open()) {
@@ -16,7 +16,7 @@ void UniSequence::log(std::string message)
 
 void UniSequence::endLog()
 {
-	log("End log function was called, function will now stop and plugin unloaded.");
+	logToFile("End log function was called, function will now stop and plugin unloaded.");
 	if(logStream.is_open()) logStream.close();
 }
 
@@ -25,21 +25,9 @@ void UniSequence::UpdateBox()
 	//MessageBox(NULL, "UniSequence 插件新版本已发布，请及时更新以获得稳定体验。", "更新可用", MB_OK);
 }
 
-UniSequence::UniSequence(void) : CPlugIn(
-	EuroScopePlugIn::COMPATIBILITY_CODE,
-	PLUGIN_NAME, PLUGIN_VER, PLUGIN_AUTHOR, PLUGIN_COPYRIGHT
-)
-{
-	// Clear local log
-	remove(LOG_FILE_NAME);
-	log("UniSequence initializing");
-	log("Attempting to register tag item type of \"Sequence\"");
-	// Registering a Tag Object for EuroScope
-	RegisterTagItemType(SEQUENCE_TAGITEM_TYPE_CODE_NAME, SEQUENCE_TAGITEM_TYPE_CODE);
-	RegisterTagItemFunction(SEQUENCE_TAGFUNC_SWITCH_STATUS, SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
-	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_INPUT, SEQUENCE_TAGITEM_FUNC_REORDER);
-	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_SELECT, SEQUENCE_TAGITEM_FUNC_REORDER_SELECT);
 #ifdef USE_WEBSOCKET
+void UniSequence::initWsThread(void)
+{
 	wsSyncThread = new std::thread([&] {
 		websocket_endpoint endpoint(this);
 		std::string restfulVer = SERVER_RESTFUL_VER;
@@ -83,7 +71,10 @@ UniSequence::UniSequence(void) : CPlugIn(
 		}
 		});
 	wsSyncThread->detach();
+}
 #else
+void UniSequence::initDataSyncThread(void)
+{
 	dataSyncThread = new thread([&] {
 		httplib::Client requestClient(SERVER_ADDRESS_PRC);
 		requestClient.set_connection_timeout(5, 0);
@@ -123,12 +114,14 @@ UniSequence::UniSequence(void) : CPlugIn(
 				Messager(e.what());
 			}
 		}
-	});
+		});
 	Messager("Start synchronizing sequence data with server.");
 	// detached anyway
 	dataSyncThread->detach();
-#endif // USE_WEBSOCKET
-	// update check thread has been detached, so it's safe
+}
+#endif
+void UniSequence::initUpdateChckThread(void)
+{
 	updateCheckThread = new std::thread([&] {
 		httplib::Client updateReq(GITHUB_UPDATE);
 		updateReq.set_connection_timeout(10, 0);
@@ -156,12 +149,37 @@ UniSequence::UniSequence(void) : CPlugIn(
 					Messager("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
 				}
 				// Now, an update prompt will only appear when and only when there is an update, without indicating that this plugin is the latest version
-			} else {
-				Messager("Error occured while checking updates - "+httplib::to_string(result.error()));
+			}
+			else {
+				Messager("Error occured while checking updates - " + httplib::to_string(result.error()));
 			}
 		}
-	});
+		});
 	updateCheckThread->detach();
+}
+UniSequence::UniSequence(void) : CPlugIn(
+	EuroScopePlugIn::COMPATIBILITY_CODE,
+	PLUGIN_NAME, PLUGIN_VER, PLUGIN_AUTHOR, PLUGIN_COPYRIGHT
+)
+{
+	// Clear local log
+	remove(LOG_FILE_NAME);
+	logToFile("UniSequence initializing");
+	logToFile("Attempting to register tag item type of \"Sequence\"");
+	// Registering a Tag Object for EuroScope
+	RegisterTagItemType(SEQUENCE_TAGITEM_TYPE_CODE_NAME, SEQUENCE_TAGITEM_TYPE_CODE);
+	RegisterTagItemFunction(SEQUENCE_TAGFUNC_SWITCH_STATUS, SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
+	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_INPUT, SEQUENCE_TAGITEM_FUNC_REORDER);
+	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_SELECT, SEQUENCE_TAGITEM_FUNC_REORDER_SELECT);
+	
+	/*init communication thread*/
+#ifdef USE_WEBSOCKET
+	initWsThread();
+#else
+	initDataSyncThread();
+#endif // USE_WEBSOCKET
+	// update check thread has been detached, so it's safe
+	initUpdateChckThread();
 
 	Messager("Initialization complete.");
 }
@@ -176,17 +194,10 @@ void UniSequence::Messager(std::string message)
 {
 	DisplayUserMessage("UniSequence", "system", message.c_str(),
 		false, true, true, true, true);
-	log(message);
+	logToFile(message);
 }
-
-bool UniSequence::OnCompileCommand(const char* sCommandLine)
+bool UniSequence::customCommandHanlder(std::string cmd)
 {
-	std::string cmd = sCommandLine;
-	std::regex unisRegex(".");
-	log("Command received: " + cmd);
-	// transform cmd to uppercase in order for identify
-	transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
-
 	// display copyright and help link information
 	if (cmd.substr(0, 5) == ".UNIS")
 	{
@@ -198,21 +209,21 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 	// Set airports to be listened
 	if (cmd.substr(0, 4) == ".SQA")
 	{
-		log("command \".SQA\" acknowledged.");
+		logToFile("command \".SQA\" acknowledged.");
 		try
 		{
-			log("Spliting cmd");
+			logToFile("Spliting cmd");
 			std::stringstream ss(cmd);
 			char delim = ' ';
 			std::string item;
-			log("Clearing airport list");
+			logToFile("Clearing airport list");
 			airportList.clear();
-			log("Airport list cleared");
+			logToFile("Airport list cleared");
 			while (getline(ss, item, delim))
 			{
 				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
 				{
-					log("Adding " + item + " to airport list");
+					logToFile("Adding " + item + " to airport list");
 					airportList.push_back(item);
 				}
 			}
@@ -228,32 +239,32 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 	}
 	if (cmd.substr(0, 4) == ".SQP")
 	{
-		log("command \".SQP\" acknowledged.");
+		logToFile("command \".SQP\" acknowledged.");
 		Messager("Current in list: ");
 		Messager(std::to_string(airportList.size()));
 		return true;
 	}
 	if (cmd.substr(0, 4) == ".SQC")
 	{
-		log("command \".SQC\" acknowledged.");
+		logToFile("command \".SQC\" acknowledged.");
 		try
 		{
-			log("Spliting cmd");
+			logToFile("Spliting cmd");
 			std::stringstream ss(cmd);
 			char delim = ' ';
 			std::string item;
-			log("Clearing airport list");
+			logToFile("Clearing airport list");
 			airportList.clear();
-			log("Airport list cleared");
+			logToFile("Airport list cleared");
 			while (getline(ss, item, delim))
 			{
 				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
 				{
-					log("Saving logon code: " + item + " to settings");
+					logToFile("Saving logon code: " + item + " to settings");
 					std::string lowercode = item.c_str();
 					transform(lowercode.begin(), lowercode.end(), lowercode.begin(), ::tolower);
 					SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, lowercode.c_str());
-					log("Logon code saved.");
+					logToFile("Logon code saved.");
 				}
 			}
 			Messager(MSG_LOGON_CODE_SAVED);
@@ -267,11 +278,20 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 
 	return false;
 }
+bool UniSequence::OnCompileCommand(const char* sCommandLine)
+{
+	std::string cmd = sCommandLine;
+	std::regex unisRegex(".");
+	logToFile("Command received: " + cmd);
+	// transform cmd to uppercase in order for identify
+	transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
+	return customCommandHanlder(cmd);
+}
 
 void UniSequence::PatchStatus(CFlightPlan fp, int status)
 {
 	std::string cs = fp.GetCallsign();
-	log("Attempting to patch status of " + cs);
+	logToFile("Attempting to patch status of " + cs);
 	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 #ifdef PATCH_WITH_LOGON_CODE
 	if (!logonCode)
@@ -333,9 +353,10 @@ SeqN* UniSequence::GetFromList(CFlightPlan fp)
 	}
 	return nullptr;
 }
+
 void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area)
 {
-	log(std::format("Function (ID: {}) is called by EuroScope, param: {}", fId, sItemString));
+	logToFile(std::format("Function (ID: {}) is called by EuroScope, param: {}", fId, sItemString));
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
@@ -347,11 +368,11 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	switch (fId)
 	{
 	case SEQUENCE_TAGITEM_FUNC_REORDER:
-		log("Function: SEQUENCE_TAG_ITEM_FUNC_REORDER was called");
+		logToFile("Function: SEQUENCE_TAG_ITEM_FUNC_REORDER was called");
 		OpenPopupEdit(area, SEQUENCE_TAGITEM_FUNC_REORDER_EDITED, "");
 		break;
 	case SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE:
-		log("Function: SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE was called");
+		logToFile("Function: SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE was called");
 		OpenPopupList(area, fp.GetCallsign(), 2);
 		AddPopupListElement(STATUS_DESC_WFCR, "", FUNC_SWITCH_TO_WFCR);
 		AddPopupListElement(STATUS_DESC_CLRD, "", FUNC_SWITCH_TO_CLRD);
@@ -375,7 +396,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:
 		if (!thisAc) return;
-		log("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
+		logToFile("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
 		logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 #ifdef PATCH_WITH_LOGON_CODE
 		if (!logonCode)
@@ -392,7 +413,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		{
 			beforeKey = sItemString;
 		}
-		log("Creating an new thread for reorder request");
+		logToFile("Creating an new thread for reorder request");
 		reOrderThread = new std::thread([beforeKey, fp, this] {
 			httplib::Client req(SERVER_ADDRESS_PRC);
 			req.set_connection_timeout(10, 0);
@@ -413,40 +434,40 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 				Messager(httplib::to_string(res.error()));
 			}
 			});
-		log("Detaching reorder thread");
+		logToFile("Detaching reorder thread");
 		reOrderThread->detach();
-		log("reorder thread detached");
+		logToFile("reorder thread detached");
 		break;
 	case FUNC_SWITCH_TO_WFCR:
-		log("Function: FUNC_SWITCH_TO_WFCR was called");
+		logToFile("Function: FUNC_SWITCH_TO_WFCR was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_WFCR);
 		break;
 	case FUNC_SWITCH_TO_CLRD:
-		log("Function: FUNC_SWITCH_TO_CLRD was called");
+		logToFile("Function: FUNC_SWITCH_TO_CLRD was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_CLRD);
 		break;
 	case FUNC_SWITCH_TO_WFPU:
-		log("Function: FUNC_SWITCH_TO_WFPU was called");
+		logToFile("Function: FUNC_SWITCH_TO_WFPU was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_WFPU);
 		break;
 	case FUNC_SWITCH_TO_PUSH:
-		log("Function: FUNC_SWITCH_TO_PUSH was called");
+		logToFile("Function: FUNC_SWITCH_TO_PUSH was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_PUSH);
 		break;
 	case FUNC_SWITCH_TO_WFTX:
-		log("Function: FUNC_SWITCH_TO_WFTX was called");
+		logToFile("Function: FUNC_SWITCH_TO_WFTX was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_WFTX);
 		break;
 	case FUNC_SWITCH_TO_TAXI:
-		log("Function: FUNC_SWITCH_TO_TAXI was called");
+		logToFile("Function: FUNC_SWITCH_TO_TAXI was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_TAXI);
 		break;
 	case FUNC_SWITCH_TO_WFTO:
-		log("Function: FUNC_SWITCH_TO_WFTO was called");
+		logToFile("Function: FUNC_SWITCH_TO_WFTO was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_WFTO);
 		break;
 	case FUNC_SWITCH_TO_TOGA:
-		log("Function: FUNC_SWITCH_TO_TOGA was called");
+		logToFile("Function: FUNC_SWITCH_TO_TOGA was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_TOGA);
 		break;
 	default:
@@ -460,9 +481,9 @@ auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 		return airport == dep_airport;
 	};
 	if (std::find_if(airportList.cbegin(), airportList.cend(), is_same_airport) == airportList.cend()) {
-		log(std::format("Airport {} is not in the list.", dep_airport));
+		logToFile(std::format("Airport {} is not in the list.", dep_airport));
 		airportList.push_back(dep_airport);
-		log(std::format("Airport {} added.", dep_airport));
+		logToFile(std::format("Airport {} added.", dep_airport));
 	}
 }
 

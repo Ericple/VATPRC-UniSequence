@@ -127,7 +127,7 @@ public:
 	void endLog();
 	std::ofstream logStream;
 	std::ifstream wsReadStream;
-	void log(std::string);
+	void logToFile(std::string);
 	std::string activeWsSyncString;
 	void PatchStatus(CFlightPlan, int);
 	SeqN* GetFromList(CFlightPlan);
@@ -136,13 +136,17 @@ public:
 private:
 	std::mutex loglock;
 	bool showUpdateBox = true;
+	bool customCommandHanlder(std::string);
 	std::mutex j_queueLock;
 	std::thread* updateCheckThread;
+	void initUpdateChckThread(void);
 	nlohmann::json j_queueCaches;
 #ifdef USE_WEBSOCKET
 	std::thread* wsSyncThread;
+	void initWsThread(void);
 #else
 	thread* dataSyncThread;
+	void initDataSyncThread(void);
 #endif
 	bool syncThreadFlag = true, updateCheckFlag = true;
 	const char* logonCode;

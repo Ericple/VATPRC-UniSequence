@@ -14,7 +14,7 @@ auto UniSequence::logToFile(std::string message) -> void
 	logStream.close();
 }
 
-auto UniSequence::endLog() -> void
+auto UniSequence::closeLogStream() -> void
 {
 	logToFile("End log function was called, function will now stop and plugin unloaded.");
 	if(logStream.is_open()) logStream.close();
@@ -37,11 +37,11 @@ auto UniSequence::initWsThread(void) -> void
 					if (id >= 0)
 					{
 						socketList.push_back({ airport, id });
-						Messager("Ws connection established, fetching data of " + airport);
+						log("Ws connection established, fetching data of " + airport);
 					}
 					else
 					{
-						Messager("Ws connection failed.");
+						log("Ws connection failed.");
 					}
 				}
 			}
@@ -120,29 +120,29 @@ auto UniSequence::initUpdateChckThread(void) -> void
 	updateCheckThread = new std::thread([&] {
 		httplib::Client updateReq(GITHUB_UPDATE);
 		updateReq.set_connection_timeout(10, 0);
-		Messager("Start updates check routine.");
+		log("Start updates check routine.");
 		if (updateCheckFlag) {
 			if (auto result = updateReq.Get(GITHUB_UPDATE_PATH)) {
 				json versionInfo = json::parse(result->body);
 				if (versionInfo.contains("message")) {
-					Messager("Error occured while checking updates.");
-					Messager(versionInfo["message"]);
+					log("Error occured while checking updates.");
+					log(versionInfo["message"]);
 					return;
 				}
 				if (!versionInfo.is_array()) {
-					Messager("Error occured while checking updates.");
+					log("Error occured while checking updates.");
 					return;
 				}
 				std::string versionTag = versionInfo[0]["tag_name"];
 				std::string versionName = versionInfo[0]["name"];
 				std::string publishDate = versionInfo[0]["created_at"];
 				if (versionTag != PLUGIN_VER) {
-					Messager("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
+					log("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
 				}
 				// Now, an update prompt will only appear when and only when there is an update, without indicating that this plugin is the latest version
 			}
 			else {
-				Messager("Error occured while checking updates - " + httplib::to_string(result.error()));
+				log("Error occured while checking updates - " + httplib::to_string(result.error()));
 			}
 		}
 		});
@@ -172,7 +172,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 	// update check thread has been detached, so it's safe
 	initUpdateChckThread();
 
-	Messager("Initialization complete.");
+	log("Initialization complete.");
 }
 
 UniSequence::~UniSequence(void)
@@ -181,7 +181,7 @@ UniSequence::~UniSequence(void)
 	updateCheckFlag = false;
 }
 
-auto UniSequence::Messager(std::string message) -> void
+auto UniSequence::log(std::string message) -> void
 {
 	DisplayUserMessage("UniSequence", "system", message.c_str(),
 		false, true, true, true, true);
@@ -192,9 +192,9 @@ auto UniSequence::customCommandHanlder(std::string cmd) -> bool
 	// display copyright and help link information
 	if (cmd.substr(0, 5) == ".UNIS")
 	{
-		Messager("UniSequence Plugin For VATPRC DIVISION.");
-		Messager("Author: Ericple Garrison");
-		Messager("For help and bug report, refer to https://github.com/Ericple/VATPRC-UniSequence");
+		log("UniSequence Plugin For VATPRC DIVISION.");
+		log("Author: Ericple Garrison");
+		log("For help and bug report, refer to https://github.com/Ericple/VATPRC-UniSequence");
 		return true;
 	}
 	// Set airports to be listened
@@ -218,21 +218,21 @@ auto UniSequence::customCommandHanlder(std::string cmd) -> bool
 					airportList.push_back(item);
 				}
 			}
-			if (airportList.size() > 1) Messager("Airports saved.");
-			if (airportList.size() == 1) Messager("Airport saved.");
-			if (airportList.size() < 1) Messager("Airport cleared.");
+			if (airportList.size() > 1) log("Airports saved.");
+			if (airportList.size() == 1) log("Airport saved.");
+			if (airportList.size() < 1) log("Airport cleared.");
 		}
 		catch (std::runtime_error const& e)
 		{
-			Messager("Error: " + *e.what());
+			log("Error: " + *e.what());
 		}
 		return true;
 	}
 	if (cmd.substr(0, 4) == ".SQP")
 	{
 		logToFile("command \".SQP\" acknowledged.");
-		Messager("Current in list: ");
-		Messager(std::to_string(airportList.size()));
+		log("Current in list: ");
+		log(std::to_string(airportList.size()));
 		return true;
 	}
 	if (cmd.substr(0, 4) == ".SQC")
@@ -258,11 +258,11 @@ auto UniSequence::customCommandHanlder(std::string cmd) -> bool
 					logToFile("Logon code saved.");
 				}
 			}
-			Messager(MSG_LOGON_CODE_SAVED);
+			log(MSG_LOGON_CODE_SAVED);
 		}
 		catch (std::runtime_error const& e)
 		{
-			Messager("Error: " + *e.what());
+			log("Error: " + *e.what());
 		}
 		return true;
 	}
@@ -286,7 +286,7 @@ auto UniSequence::PatchStatus(CFlightPlan fp, int status) -> void
 	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 	if (!logonCode)
 	{
-		Messager(ERR_LOGON_CODE_NULLREF);
+		log(ERR_LOGON_CODE_NULLREF);
 		return;
 	}
 	std::thread patchThread([fp, status, this] {
@@ -301,27 +301,27 @@ auto UniSequence::PatchStatus(CFlightPlan fp, int status) -> void
 		{
 			if (result->status == 200)
 			{
-				setQueueJson(ap, result->body);
+				setQueueFromJson(ap, result->body);
 			}
 			else
 			{
 				if (result->status == 403)
 				{
-					Messager("Logon code verification failed.");
+					log("Logon code verification failed.");
 				}
 			}
 		}
 		else
 		{
-			Messager(ERR_CONN_FAILED);
+			log(ERR_CONN_FAILED);
 		}
 		});
 	patchThread.detach();
 }
 
-auto UniSequence::setQueueJson(const std::string& airport, const std::string& content) -> void
+auto UniSequence::setQueueFromJson(const std::string& airport, const std::string& content) -> void
 {
-	std::lock_guard<std::mutex> guard(j_queueLock);
+	std::lock_guard<std::mutex> guard(queueCacheLock);
 	j_queueCaches[airport] = json::parse(content)["data"];
 }
 
@@ -389,7 +389,7 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 		if (!logonCode)
 		{
-			Messager(ERR_LOGON_CODE_NULLREF);
+			log(ERR_LOGON_CODE_NULLREF);
 			return;
 		}
 		if (sItemString == SEQUENCE_TAGFUNC_REORDER_TOPKEY)
@@ -413,12 +413,12 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 			{
 				if (res->status == 200)
 				{
-					setQueueJson(ap, res->body);
+					setQueueFromJson(ap, res->body);
 				}
 			}
 			else
 			{
-				Messager(httplib::to_string(res.error()));
+				log(httplib::to_string(res.error()));
 			}
 			});
 		logToFile("Detaching reorder thread");

@@ -36,26 +36,7 @@ void connection_metadata::on_message(websocketpp::connection_hdl, client::messag
 	if (msg->get_opcode() == websocketpp::frame::opcode::text)
 	{
 		std::string resBody = msg->get_payload().c_str();
-		uniptr->setQueueJson(icao, "{\"data\":" + resBody + "}");
-		//uniptr->Update_s_queueCache("{\"data\":"+resBody+"}");
-		/*nlohmann::json ws_data_json = nlohmann::json::parse(resBody);
-		int seqNum = 1;
-		try
-		{
-			for (auto& seqObj : ws_data_json)
-			{
-				string cs = seqObj[JSON_KEY_CALLSIGN];
-				int status = seqObj[JSON_KEY_STATUS];
-				uniptr->SyncSeq(cs, status);
-				uniptr->SyncSeqNum(cs, seqNum);
-				seqNum++;
-			}
-			uniptr->ClearUpdateFlag(icao);
-		}
-		catch (exception const& e)
-		{
-			uniptr->Messager(e.what());
-		}*/
+		uniptr->setQueueFromJson(icao, "{\"data\":" + resBody + "}");
 	}
 }
 

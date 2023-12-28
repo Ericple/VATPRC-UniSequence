@@ -116,19 +116,19 @@ class UniSequence : public CPlugIn
 public:
 	UniSequence();
 	~UniSequence();
-	std::vector<std::string> airportList;
-	std::mutex j_queueLock, loglock;
-	std::vector<ASocket> socketList;
 	std::ofstream logStream;
-	auto endLog(void) -> void;
-	auto Messager(std::string) -> void;
+	std::vector<ASocket> socketList;
+	std::mutex queueCacheLock, loglock;
+	std::vector<std::string> airportList;
+	auto log(std::string) -> void;
+	auto closeLogStream(void) -> void;
 	auto logToFile(std::string) -> void;
 	auto GetFromList(CFlightPlan) -> SeqN*;
 	auto PatchStatus(CFlightPlan, int) -> void;
 	virtual auto OnCompileCommand(const char*) -> bool;
 	virtual auto OnGetTagItem(CFlightPlan, CRadarTarget, 
 		int, int, char[16], int*, COLORREF*, double*) -> void;
-	auto setQueueJson(const std::string&, const std::string&) -> void;
+	auto setQueueFromJson(const std::string&, const std::string&) -> void;
 	virtual auto OnFunctionCall(int, const char*, POINT, RECT) -> void;
 private:
 	int timerInterval = 5;

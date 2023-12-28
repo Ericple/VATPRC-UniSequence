@@ -229,10 +229,8 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 	if (cmd.substr(0, 4) == ".SQP")
 	{
 		log("command \".SQP\" acknowledged.");
-		char i[10];
-		_itoa_s(airportList.size(), i, 10);
 		Messager("Current in list: ");
-		Messager(i);
+		Messager(std::to_string(airportList.size()));
 		return true;
 	}
 	if (cmd.substr(0, 4) == ".SQC")
@@ -450,6 +448,7 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	case FUNC_SWITCH_TO_TOGA:
 		log("Function: FUNC_SWITCH_TO_TOGA was called");
 		PatchStatus(fp, AIRCRAFT_STATUS_TOGA);
+		break;
 	default:
 		break;
 	}
@@ -470,12 +469,12 @@ auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, int tagData,
 	char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize)
 {
-	// check if this tag is valid
-	if (!fp.IsValid() || !rt.IsValid()) return;
 	// check if item code is what we need to handle
 	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;
+	// check if this tag is valid
+	if (!fp.IsValid()) return;
 	// remove aircraft if it's taking off
-	if (rt.GetGS() > 50) return;
+	if (rt.IsValid() && rt.GetGS() > 50) return;
 	// check if the departure airport of this fp is in the airport list
 	std::string depAirport = fp.GetFlightPlanData().GetOrigin();
 	AddAirportIfNotExist(depAirport);

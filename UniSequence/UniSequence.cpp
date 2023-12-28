@@ -4,7 +4,7 @@
 
 using nlohmann::json;
 
-void UniSequence::logToFile(std::string message)
+auto UniSequence::logToFile(std::string message) -> void
 {
 	std::lock_guard<std::mutex> guard(loglock);
 	if (!logStream.is_open()) {
@@ -14,19 +14,14 @@ void UniSequence::logToFile(std::string message)
 	logStream.close();
 }
 
-void UniSequence::endLog()
+auto UniSequence::endLog() -> void
 {
 	logToFile("End log function was called, function will now stop and plugin unloaded.");
 	if(logStream.is_open()) logStream.close();
 }
 
-void UniSequence::UpdateBox()
-{
-	//MessageBox(NULL, "UniSequence 插件新版本已发布，请及时更新以获得稳定体验。", "更新可用", MB_OK);
-}
-
 #ifdef USE_WEBSOCKET
-void UniSequence::initWsThread(void)
+auto UniSequence::initWsThread(void) -> void
 {
 	wsSyncThread = new std::thread([&] {
 		websocket_endpoint endpoint(this);
@@ -73,7 +68,7 @@ void UniSequence::initWsThread(void)
 	wsSyncThread->detach();
 }
 #else
-void UniSequence::initDataSyncThread(void)
+auto UniSequence::initDataSyncThread(void) -> void
 {
 	dataSyncThread = new thread([&] {
 		httplib::Client requestClient(SERVER_ADDRESS_PRC);
@@ -120,7 +115,7 @@ void UniSequence::initDataSyncThread(void)
 	dataSyncThread->detach();
 }
 #endif
-void UniSequence::initUpdateChckThread(void)
+auto UniSequence::initUpdateChckThread(void) -> void
 {
 	updateCheckThread = new std::thread([&] {
 		httplib::Client updateReq(GITHUB_UPDATE);
@@ -142,10 +137,6 @@ void UniSequence::initUpdateChckThread(void)
 				std::string versionName = versionInfo[0]["name"];
 				std::string publishDate = versionInfo[0]["created_at"];
 				if (versionTag != PLUGIN_VER) {
-					if (showUpdateBox) {
-						UpdateBox();
-						showUpdateBox = false;
-					}
 					Messager("Update is available! The latest version is: " + versionName + " " + versionTag + " | Publish date: " + publishDate);
 				}
 				// Now, an update prompt will only appear when and only when there is an update, without indicating that this plugin is the latest version
@@ -190,13 +181,13 @@ UniSequence::~UniSequence(void)
 	updateCheckFlag = false;
 }
 
-void UniSequence::Messager(std::string message)
+auto UniSequence::Messager(std::string message) -> void
 {
 	DisplayUserMessage("UniSequence", "system", message.c_str(),
 		false, true, true, true, true);
 	logToFile(message);
 }
-bool UniSequence::customCommandHanlder(std::string cmd)
+auto UniSequence::customCommandHanlder(std::string cmd) -> bool
 {
 	// display copyright and help link information
 	if (cmd.substr(0, 5) == ".UNIS")
@@ -278,7 +269,7 @@ bool UniSequence::customCommandHanlder(std::string cmd)
 
 	return false;
 }
-bool UniSequence::OnCompileCommand(const char* sCommandLine)
+auto UniSequence::OnCompileCommand(const char* sCommandLine) -> bool
 {
 	std::string cmd = sCommandLine;
 	std::regex unisRegex(".");
@@ -288,18 +279,16 @@ bool UniSequence::OnCompileCommand(const char* sCommandLine)
 	return customCommandHanlder(cmd);
 }
 
-void UniSequence::PatchStatus(CFlightPlan fp, int status)
+auto UniSequence::PatchStatus(CFlightPlan fp, int status) -> void
 {
 	std::string cs = fp.GetCallsign();
 	logToFile("Attempting to patch status of " + cs);
 	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-#ifdef PATCH_WITH_LOGON_CODE
 	if (!logonCode)
 	{
 		Messager(ERR_LOGON_CODE_NULLREF);
 		return;
 	}
-#endif // PATCH_WITH_LOGON_CODE
 	std::thread patchThread([fp, status, this] {
 		json reqBody = {
 			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
@@ -330,13 +319,13 @@ void UniSequence::PatchStatus(CFlightPlan fp, int status)
 	patchThread.detach();
 }
 
-void UniSequence::setQueueJson(std::string airport, std::string content)
+auto UniSequence::setQueueJson(const std::string& airport, const std::string& content) -> void
 {
 	std::lock_guard<std::mutex> guard(j_queueLock);
 	j_queueCaches[airport] = json::parse(content)["data"];
 }
 
-SeqN* UniSequence::GetFromList(CFlightPlan fp)
+auto UniSequence::GetFromList(CFlightPlan fp) -> SeqN*
 {
 	int seqNum = 1;
 	int status = AIRCRAFT_STATUS_NULL;
@@ -354,7 +343,7 @@ SeqN* UniSequence::GetFromList(CFlightPlan fp)
 	return nullptr;
 }
 
-void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area)
+auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area) -> void
 {
 	logToFile(std::format("Function (ID: {}) is called by EuroScope, param: {}", fId, sItemString));
 	CFlightPlan fp;
@@ -485,8 +474,8 @@ auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 	}
 }
 
-void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, int tagData,
-	char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize)
+auto UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, int tagData,
+	char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize) -> void
 {
 	
 	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;// Check if item code is what we need to handle

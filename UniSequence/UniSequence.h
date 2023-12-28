@@ -109,49 +109,44 @@ typedef struct SequenceNode {
 typedef struct AirportSocket {
 	std::string icao;
 	int socketId;
-} asoc;
+} ASocket;
 
 class UniSequence : public CPlugIn
 {
 public:
 	UniSequence();
 	~UniSequence();
-	virtual bool OnCompileCommand(const char*);
-	virtual void OnFunctionCall(int, const char*, POINT, RECT);
-	virtual void OnGetTagItem(CFlightPlan, CRadarTarget, 
-		int, int, char[16], int*, COLORREF*, double*);
-	void Messager(std::string);
 	std::vector<std::string> airportList;
-	std::vector<asoc> socketList;
-	// log related
-	void endLog();
+	std::mutex j_queueLock, loglock;
+	std::vector<ASocket> socketList;
 	std::ofstream logStream;
-	std::ifstream wsReadStream;
-	void logToFile(std::string);
-	std::string activeWsSyncString;
-	void PatchStatus(CFlightPlan, int);
-	SeqN* GetFromList(CFlightPlan);
-	void setQueueJson(std::string, std::string);
-	void UpdateBox();
+	auto endLog(void) -> void;
+	auto Messager(std::string) -> void;
+	auto logToFile(std::string) -> void;
+	auto GetFromList(CFlightPlan) -> SeqN*;
+	auto PatchStatus(CFlightPlan, int) -> void;
+	virtual auto OnCompileCommand(const char*) -> bool;
+	virtual auto OnGetTagItem(CFlightPlan, CRadarTarget, 
+		int, int, char[16], int*, COLORREF*, double*) -> void;
+	auto setQueueJson(const std::string&, const std::string&) -> void;
+	virtual auto OnFunctionCall(int, const char*, POINT, RECT) -> void;
 private:
-	std::mutex loglock;
-	bool showUpdateBox = true;
-	bool customCommandHanlder(std::string);
-	std::mutex j_queueLock;
-	std::thread* updateCheckThread;
-	void initUpdateChckThread(void);
+	int timerInterval = 5;
+	const char* logonCode;
 	nlohmann::json j_queueCaches;
+	std::thread* updateCheckThread;
+	bool syncThreadFlag = true, updateCheckFlag = true;
+	auto initUpdateChckThread(void) -> void;
+	auto customCommandHanlder(std::string) -> bool;
+	auto AddAirportIfNotExist(const std::string&) -> void;
 #ifdef USE_WEBSOCKET
 	std::thread* wsSyncThread;
-	void initWsThread(void);
+	auto initWsThread(void) -> void;
 #else
 	thread* dataSyncThread;
-	void initDataSyncThread(void);
+	auto initDataSyncThread(void) -> void;
 #endif
-	bool syncThreadFlag = true, updateCheckFlag = true;
-	const char* logonCode;
-	int timerInterval = 5;
 
-	auto AddAirportIfNotExist(const std::string&) -> void;
+	
 };
 

@@ -398,13 +398,11 @@ void UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		if (!thisAc) return;
 		logToFile("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
 		logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-#ifdef PATCH_WITH_LOGON_CODE
 		if (!logonCode)
 		{
 			Messager(ERR_LOGON_CODE_NULLREF);
 			return;
 		}
-#endif // PATCH_WITH_LOGON_CODE
 		if (sItemString == SEQUENCE_TAGFUNC_REORDER_TOPKEY)
 		{
 			beforeKey = "-1";
@@ -490,32 +488,40 @@ auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 void UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, int tagData,
 	char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize)
 {
-	// check if item code is what we need to handle
-	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;
-	// check if this tag is valid
-	if (!fp.IsValid()) return;
-	// remove aircraft if it's taking off
-	if (rt.IsValid() && rt.GetGS() > 50) return;
-	// check if the departure airport of this fp is in the airport list
-	std::string depAirport = fp.GetFlightPlanData().GetOrigin();
-	AddAirportIfNotExist(depAirport);
-	int seqNum = 1;
-	int status = AIRCRAFT_STATUS_NULL;
-	json list = j_queueCaches[depAirport];
-	bool seqadd = true;
-	for (auto& node : list)
+	
+	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;// Check if item code is what we need to handle
+	
+	if (!fp.IsValid()) return;// Check if the flight plan of this tag is valid
+	
+	if (rt.IsValid() && rt.GetGS() > 50) return;// If the radar target is valid and ground speed greater than 50kts, remove this aircraft cause it's taking off
+	
+	std::string depAirport = fp.GetFlightPlanData().GetOrigin();// Get departure airport from flight plan object
+
+	AddAirportIfNotExist(depAirport);// Check if the departure airport of this flight plan is in the managed airport list
+
+	int seqNum = 1;// For iterate use below
+
+	int status = AIRCRAFT_STATUS_NULL;// For iterate use below
+
+	json list = j_queueCaches[depAirport];// For iterate use below
+
+	bool seqadd = true;// For iterate use below
+
+	for (auto& node : list)// Iterate each node in queue fetched from server
 	{
-		if (node["callsign"] == fp.GetCallsign())
+		if (node["callsign"] == fp.GetCallsign())// Synchronize status from server
 		{
 			status = node["status"];
 			seqadd = false;
 		}
 		if (seqadd) seqNum++;
 	}
-	// you won't want to say "Your sequence number is one hundred and fivty nine" :D
-	if (seqNum > 99) seqNum = 99;
-	int bufferSize = strlen(STATUS_TEXT_PLACE_HOLDER) + 1;
-	switch (status)
+	
+	if (seqNum > 99) seqNum = 99;// you won't want to say "Your sequence number is one hundred and fivty nine"
+
+	int bufferSize = strlen(STATUS_TEXT_PLACE_HOLDER) + 1;// Get buffer length from status
+
+	switch (status)// Print correspond status string to sItemString
 	{
 	case AIRCRAFT_STATUS_NULL:
 		sprintf_s(sItemString, bufferSize, "%s", STATUS_TEXT_NULL);

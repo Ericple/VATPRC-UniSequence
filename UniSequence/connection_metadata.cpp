@@ -36,7 +36,7 @@ void connection_metadata::on_message(websocketpp::connection_hdl, client::messag
 	if (msg->get_opcode() == websocketpp::frame::opcode::text)
 	{
 		std::string resBody = msg->get_payload().c_str();
-		uniptr->setQueueFromJson(icao, "{\"data\":" + resBody + "}");
+		uniptr->SetQueueFromJson(icao, "{\"data\":" + resBody + "}");
 	}
 }
 

@@ -100,12 +100,18 @@ using namespace EuroScopePlugIn;
 #define LOG_FILE_NAME "unilog.log"
 #endif // !LOGGER_RELATED
 
+//===========================
+// Aircraft instance
+//===========================
 typedef struct SequenceNode {
 	std::string callsign, origin;
 	int status, sequenceNumber;
 	bool seqNumUpdated;
 } SeqNode;
 
+//============================
+// Socket instance of an airport
+//============================
 typedef struct AirportSocket {
 	std::string icao;
 	int socketId;
@@ -116,38 +122,40 @@ class UniSequence : public CPlugIn
 public:
 	UniSequence();
 	~UniSequence();
-	std::ofstream logStream;
-	std::vector<ASocket> socketList;
-	std::mutex queueCacheLock, loglock;
-	std::vector<std::string> airportList;
-	auto log(std::string) -> void;
-	auto closeLogStream(void) -> void;
-	auto logToFile(std::string) -> void;
+	std::ofstream log_stream_;
+	std::vector<ASocket> socket_list_;
+	std::mutex queue_cache_lock_, log_lock_;
+	std::vector<std::string> airport_list_;
+	auto LogToES(std::string) -> void;
+	auto LogToFile(std::string) -> void;
 	auto GetManagedAircraft(CFlightPlan) -> SeqNode*;
 	auto PatchAircraftStatus(CFlightPlan, int) -> void;
 	virtual auto OnCompileCommand(const char*) -> bool;
 	virtual auto OnGetTagItem(CFlightPlan, CRadarTarget, 
 		int, int, char[16], int*, COLORREF*, double*) -> void;
 	virtual auto OnFunctionCall(int, const char*, POINT, RECT) -> void;
-	auto setQueueFromJson(const std::string&, const std::string&) -> void;
+	auto SetQueueFromJson(const std::string&, const std::string&) -> void;
 private:
-	int timerInterval = 5;
-	const char* logonCode;
-	nlohmann::json j_queueCaches;
-	std::thread* updateCheckThread;
-	bool syncThreadFlag = true, updateCheckFlag = true;
-	auto initUpdateChckThread(void) -> void;
-	auto customCommandHanlder(std::string) -> bool;
+	int timer_interval_ = 5;
+	const char* logon_code_;
+	nlohmann::json queue_caches_;
+	bool sync_thread_flag_ = true;
+	bool update_check_flag_ = true;
+	std::thread* update_check_thread_;
+	auto InitTagItem(void) -> void;
+	auto InitializeLogEnv(void) -> void;
+	auto InitUpdateChckThread(void) -> void;
+	auto ReorderAircraftByEdit(RECT) -> void;
+	auto CustomCommandHanlder(std::string) -> bool;
+	auto OpenStatusAsignMenu(RECT, CFlightPlan) -> void;
 	auto AddAirportIfNotExist(const std::string&) -> void;
-	auto commandMatch(const std::string&, const char*) -> bool;
-	auto reorderAircraftByEdit(RECT) -> void;
-	auto reorderAircraftByEditHandler(SeqNode*, CFlightPlan, const char*) -> void;
-	auto reorderAircraftBySelect(SeqNode*, RECT, const std::string&) -> void;
-	auto openStatusAsignMenu(RECT, CFlightPlan) -> void;
-	auto isTagItemValid(int, CFlightPlan, CRadarTarget) -> bool;
+	auto CommandMatch(const std::string&, const char*) -> bool;
+	auto IsTagItemValid(int, CFlightPlan, CRadarTarget) -> bool;
+	auto ReorderAircraftBySelect(SeqNode*, RECT, const std::string&) -> void;
+	auto ReorderAircraftEditHandler(SeqNode*, CFlightPlan, const char*) -> void;
 #ifdef USE_WEBSOCKET
-	std::thread* wsSyncThread;
-	auto initWsThread(void) -> void;
+	std::thread* ws_sync_thread_;
+	auto InitWsThread(void) -> void;
 #else
 	thread* dataSyncThread;
 	auto initDataSyncThread(void) -> void;

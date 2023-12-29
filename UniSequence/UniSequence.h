@@ -150,7 +150,6 @@ private:
 	auto OpenStatusAsignMenu(RECT, CFlightPlan) -> void;
 	auto AddAirportIfNotExist(const std::string&) -> void;
 	auto CommandMatch(const std::string&, const char*) -> bool;
-	auto IsTagItemValid(int, CFlightPlan, CRadarTarget) -> bool;
 	auto ReorderAircraftBySelect(SeqNode*, RECT, const std::string&) -> void;
 	auto ReorderAircraftEditHandler(SeqNode*, CFlightPlan, const char*) -> void;
 #ifdef USE_WEBSOCKET

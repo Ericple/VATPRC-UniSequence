@@ -364,3 +364,5 @@ MigrationBackup/
 FodyWeavers.xsd
 /NO_WSSL
 /UniSequence/NO_WSSL/UniSequence.tlog
+
+*.DS_Store

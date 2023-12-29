@@ -27,7 +27,7 @@ auto UniSequence::InitWsThread(void) -> void
 				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
 				if (std::find_if(socket_list_.begin(), socket_list_.end(), airport_socket) == socket_list_.end())
 				{
-					
+
 					int id = endpoint.connect(std::format("{}{}{}/ws", WS_ADDRESS_PRC, restfulVer, airport), airport);
 					if (id >= 0)
 					{
@@ -165,7 +165,7 @@ UniSequence::UniSequence(void) : CPlugIn(
 	InitializeLogEnv();
 	// Registering a Tag Object for EuroScope
 	InitTagItem();
-	
+
 	/*init communication thread*/
 #ifdef USE_WEBSOCKET
 	InitWsThread();
@@ -306,7 +306,7 @@ auto UniSequence::PatchAircraftStatus(CFlightPlan fp, int status) -> void
 		httplib::Client patchReq(SERVER_ADDRESS_PRC);
 		patchReq.set_connection_timeout(10, 0);
 		std::string ap = fp.GetFlightPlanData().GetOrigin();
-		if (auto result = patchReq.Patch(std::format("{}{}/status", SERVER_RESTFUL_VER, ap) , {{HEADER_LOGON_KEY, logon_code_}}, reqBody.dump().c_str(), "application/json"))
+		if (auto result = patchReq.Patch(std::format("{}{}/status", SERVER_RESTFUL_VER, ap), { {HEADER_LOGON_KEY, logon_code_} }, reqBody.dump().c_str(), "application/json"))
 		{
 			if (result->status == 200)
 			{
@@ -345,7 +345,7 @@ auto UniSequence::GetManagedAircraft(CFlightPlan fp) -> SeqNode*
 		if (node["callsign"] == fp.GetCallsign())
 		{
 			status = node["status"];
-			return new SeqNode{node["callsign"], fp.GetFlightPlanData().GetOrigin(), status, seqNum, false};
+			return new SeqNode{ node["callsign"], fp.GetFlightPlanData().GetOrigin(), status, seqNum, false };
 		}
 		seqNum++;
 	}
@@ -358,7 +358,7 @@ auto UniSequence::ReorderAircraftByEdit(RECT area) -> void
 	OpenPopupEdit(area, SEQUENCE_TAGITEM_FUNC_REORDER_EDITED, "");
 }
 
-auto UniSequence::OpenStatusAsignMenu(RECT area, CFlightPlan fp) -> void 
+auto UniSequence::OpenStatusAsignMenu(RECT area, CFlightPlan fp) -> void
 {
 	LogToFile("Function: SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE was called");
 	OpenPopupList(area, fp.GetCallsign(), 2);
@@ -415,7 +415,7 @@ auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, co
 			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
 			{JSON_KEY_BEFORE, beforeKey}
 		};
-		
+
 		if (auto res = req.Patch(std::format("{}{}/order", SERVER_RESTFUL_VER, ap), { {HEADER_LOGON_KEY, logon_code_} }, reqBody.dump(), "application/json"))
 		{
 			if (res->status == 200)
@@ -443,7 +443,7 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	if (!fp.IsValid()) return;
 	auto thisAc = GetManagedAircraft(fp);
 	auto ap = fp.GetFlightPlanData().GetOrigin();
-	
+
 	switch (fId)
 	{
 	case SEQUENCE_TAGITEM_FUNC_REORDER:
@@ -497,9 +497,9 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 
 auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 {
-	const auto& is_same_airport = [&](auto& airport) { 
+	const auto& is_same_airport = [&](auto& airport) {
 		return airport == dep_airport;
-	};
+		};
 	if (std::find_if(airport_list_.cbegin(), airport_list_.cend(), is_same_airport) == airport_list_.cend()) {
 		LogToFile(std::format("Airport {} is not in the list.", dep_airport));
 		airport_list_.push_back(dep_airport);
@@ -507,22 +507,11 @@ auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 	}
 }
 
-auto UniSequence::IsTagItemValid(int itemCode, CFlightPlan fp, CRadarTarget rt) -> bool
-{
-	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return false;// Check if item code is what we need to handle
-
-	if (!fp.IsValid()) return false;// Check if the flight plan of this tag is valid
-
-	if (rt.IsValid() && rt.GetGS() > 50) return false;// If the radar target is valid and ground speed greater than 50kts, remove this aircraft cause it's taking off
-
-	return true;
-}
-
 auto UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, int tagData,
 	char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize) -> void
 {
-	if (!IsTagItemValid(itemCode, fp, rt)) return;
-	
+	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE || !fp.IsValid()) return; // Only deals with valid fp requesting corresponding item
+
 	std::string depAirport = fp.GetFlightPlanData().GetOrigin();// Get departure airport from flight plan object
 
 	AddAirportIfNotExist(depAirport);// Check if the departure airport of this flight plan is in the managed airport list
@@ -544,7 +533,7 @@ auto UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 		}
 		if (seqadd) seqNum++;
 	}
-	
+
 	if (seqNum > 99) seqNum = 99;// you won't want to say "Your sequence number is one hundred and fivty nine"
 
 	int bufferSize = strlen(STATUS_TEXT_PLACE_HOLDER) + 1;// Get buffer length from status

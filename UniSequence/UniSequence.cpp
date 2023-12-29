@@ -181,6 +181,9 @@ UniSequence::~UniSequence(void)
 {
 	sync_thread_flag_ = false;
 	update_check_flag_ = false;
+	delete update_check_thread_;
+	delete ws_sync_thread_;
+	delete logon_code_;
 }
 
 auto UniSequence::LogToES(std::string message) -> void
@@ -402,7 +405,7 @@ auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, co
 		beforeKey = sItemString;
 	}
 	LogToFile("Creating an new thread for reorder request");
-	reOrderThread = new std::thread([beforeKey, fp, this] {
+	reOrderThread = new std::thread([beforeKey, fp, this, reOrderThread] {
 		httplib::Client req(SERVER_ADDRESS_PRC);
 		req.set_connection_timeout(10, 0);
 		std::string ap = fp.GetFlightPlanData().GetOrigin();
@@ -410,16 +413,19 @@ auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, co
 			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
 			{JSON_KEY_BEFORE, beforeKey}
 		};
-		if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", { {HEADER_LOGON_KEY, logon_code_} }, reqBody.dump(), "application/json"))
+		
+		if (auto res = req.Patch(std::format("{}{}/order", SERVER_RESTFUL_VER, ap), { {HEADER_LOGON_KEY, logon_code_} }, reqBody.dump(), "application/json"))
 		{
 			if (res->status == 200)
 			{
 				SetQueueFromJson(ap, res->body);
+				delete reOrderThread;
 			}
 		}
 		else
 		{
 			LogToES(httplib::to_string(res.error()));
+			delete reOrderThread;
 		}
 		});
 	LogToFile("Detaching reorder thread");
@@ -486,6 +492,7 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	default:
 		break;
 	}
+	delete thisAc;
 }
 
 auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void

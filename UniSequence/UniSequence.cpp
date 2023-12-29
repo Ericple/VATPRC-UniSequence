@@ -187,18 +187,22 @@ auto UniSequence::log(std::string message) -> void
 		false, true, true, true, true);
 	logToFile(message);
 }
+auto UniSequence::commandMatch(const std::string& cmd, const char* target) -> bool
+{
+	return cmd.substr(0, strlen(target)) == target;
+}
 auto UniSequence::customCommandHanlder(std::string cmd) -> bool
 {
 	// display copyright and help link information
-	if (cmd.substr(0, 5) == ".UNIS")
+	if (commandMatch(cmd, ".UNIS"))
 	{
-		log("UniSequence Plugin For VATPRC DIVISION.");
+		log("UniSequence Plugin By VATPRC DIVISION.");
 		log("Author: Ericple Garrison");
 		log("For help and bug report, refer to https://github.com/Ericple/VATPRC-UniSequence");
 		return true;
 	}
 	// Set airports to be listened
-	if (cmd.substr(0, 4) == ".SQA")
+	if (commandMatch(cmd, ".SQA"))
 	{
 		logToFile("command \".SQA\" acknowledged.");
 		try
@@ -228,14 +232,14 @@ auto UniSequence::customCommandHanlder(std::string cmd) -> bool
 		}
 		return true;
 	}
-	if (cmd.substr(0, 4) == ".SQP")
+	if (commandMatch(cmd, ".SQP"))
 	{
 		logToFile("command \".SQP\" acknowledged.");
 		log("Current in list: ");
 		log(std::to_string(airportList.size()));
 		return true;
 	}
-	if (cmd.substr(0, 4) == ".SQC")
+	if (commandMatch(cmd, ".SQC"))
 	{
 		logToFile("command \".SQC\" acknowledged.");
 		try
@@ -266,7 +270,6 @@ auto UniSequence::customCommandHanlder(std::string cmd) -> bool
 		}
 		return true;
 	}
-
 	return false;
 }
 auto UniSequence::OnCompileCommand(const char* sCommandLine) -> bool
@@ -274,15 +277,14 @@ auto UniSequence::OnCompileCommand(const char* sCommandLine) -> bool
 	std::string cmd = sCommandLine;
 	std::regex unisRegex(".");
 	logToFile("Command received: " + cmd);
-	// transform cmd to uppercase in order for identify
 	transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
 	return customCommandHanlder(cmd);
 }
 
-auto UniSequence::PatchStatus(CFlightPlan fp, int status) -> void
+auto UniSequence::PatchAircraftStatus(CFlightPlan fp, int status) -> void
 {
 	std::string cs = fp.GetCallsign();
-	logToFile("Attempting to patch status of " + cs);
+	logToFile(std::format("Attempting to patch status of {}", cs));
 	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 	if (!logonCode)
 	{
@@ -325,7 +327,7 @@ auto UniSequence::setQueueFromJson(const std::string& airport, const std::string
 	j_queueCaches[airport] = json::parse(content)["data"];
 }
 
-auto UniSequence::GetFromList(CFlightPlan fp) -> SeqN*
+auto UniSequence::GetManagedAircraft(CFlightPlan fp) -> SeqNode*
 {
 	int seqNum = 1;
 	int status = AIRCRAFT_STATUS_NULL;
@@ -336,11 +338,91 @@ auto UniSequence::GetFromList(CFlightPlan fp) -> SeqN*
 		if (node["callsign"] == fp.GetCallsign())
 		{
 			status = node["status"];
-			return new SeqN{node["callsign"], fp.GetFlightPlanData().GetOrigin(), status, seqNum, false};
+			return new SeqNode{node["callsign"], fp.GetFlightPlanData().GetOrigin(), status, seqNum, false};
 		}
 		seqNum++;
 	}
 	return nullptr;
+}
+
+auto UniSequence::reorderAircraftByEdit(RECT area) -> void
+{
+	logToFile("Function: SEQUENCE_TAG_ITEM_FUNC_REORDER was called");
+	OpenPopupEdit(area, SEQUENCE_TAGITEM_FUNC_REORDER_EDITED, "");
+}
+
+auto UniSequence::openStatusAsignMenu(RECT area, CFlightPlan fp) -> void 
+{
+	logToFile("Function: SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE was called");
+	OpenPopupList(area, fp.GetCallsign(), 2);
+	AddPopupListElement(STATUS_DESC_WFCR, "", FUNC_SWITCH_TO_WFCR);
+	AddPopupListElement(STATUS_DESC_CLRD, "", FUNC_SWITCH_TO_CLRD);
+	AddPopupListElement(STATUS_DESC_WFPU, "", FUNC_SWITCH_TO_WFPU);
+	AddPopupListElement(STATUS_DESC_PUSH, "", FUNC_SWITCH_TO_PUSH);
+	AddPopupListElement(STATUS_DESC_WFTX, "", FUNC_SWITCH_TO_WFTX);
+	AddPopupListElement(STATUS_DESC_TAXI, "", FUNC_SWITCH_TO_TAXI);
+	AddPopupListElement(STATUS_DESC_WFTO, "", FUNC_SWITCH_TO_WFTO);
+	AddPopupListElement(STATUS_DESC_TKOF, "", FUNC_SWITCH_TO_TOGA);
+}
+
+auto UniSequence::reorderAircraftBySelect(SeqNode* thisAc, RECT area, const std::string& ap) -> void
+{
+	json list = j_queueCaches[ap];
+	if (!thisAc) return;
+	if (thisAc->status == AIRCRAFT_STATUS_NULL) return;
+	OpenPopupList(area, "PUT BEFORE", 2);
+	AddPopupListElement(SEQUENCE_TAGFUNC_REORDER_TOPKEY, "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
+	for (auto& aircraft : list)
+	{
+		std::string cs = aircraft["callsign"];
+		if (aircraft["status"] == thisAc->status && cs != thisAc->callsign) AddPopupListElement(cs.c_str(), "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
+	}
+}
+
+auto UniSequence::reorderAircraftByEditHandler(SeqNode* thisAc, CFlightPlan fp, const char* sItemString) -> void
+{
+	std::string beforeKey;
+	std::thread* reOrderThread;
+	if (!thisAc) return;
+	logToFile("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
+	logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
+	if (!logonCode)
+	{
+		log(ERR_LOGON_CODE_NULLREF);
+		return;
+	}
+	if (sItemString == SEQUENCE_TAGFUNC_REORDER_TOPKEY)
+	{
+		beforeKey = "-1";
+	}
+	else
+	{
+		beforeKey = sItemString;
+	}
+	logToFile("Creating an new thread for reorder request");
+	reOrderThread = new std::thread([beforeKey, fp, this] {
+		httplib::Client req(SERVER_ADDRESS_PRC);
+		req.set_connection_timeout(10, 0);
+		std::string ap = fp.GetFlightPlanData().GetOrigin();
+		json reqBody = {
+			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
+			{JSON_KEY_BEFORE, beforeKey}
+		};
+		if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", { {HEADER_LOGON_KEY, logonCode} }, reqBody.dump(), "application/json"))
+		{
+			if (res->status == 200)
+			{
+				setQueueFromJson(ap, res->body);
+			}
+		}
+		else
+		{
+			log(httplib::to_string(res.error()));
+		}
+		});
+	logToFile("Detaching reorder thread");
+	reOrderThread->detach();
+	logToFile("reorder thread detached");
 }
 
 auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area) -> void
@@ -349,113 +431,55 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
-	SeqN* thisAc = GetFromList(fp);
+	SeqNode* thisAc = GetManagedAircraft(fp);
 	std::string ap = fp.GetFlightPlanData().GetOrigin();
-	std::string beforeKey;
-	std::thread* reOrderThread;
-	json list = j_queueCaches[ap];
+	
+	
 	switch (fId)
 	{
 	case SEQUENCE_TAGITEM_FUNC_REORDER:
-		logToFile("Function: SEQUENCE_TAG_ITEM_FUNC_REORDER was called");
-		OpenPopupEdit(area, SEQUENCE_TAGITEM_FUNC_REORDER_EDITED, "");
+		reorderAircraftByEdit(area);
 		break;
 	case SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE:
-		logToFile("Function: SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE was called");
-		OpenPopupList(area, fp.GetCallsign(), 2);
-		AddPopupListElement(STATUS_DESC_WFCR, "", FUNC_SWITCH_TO_WFCR);
-		AddPopupListElement(STATUS_DESC_CLRD, "", FUNC_SWITCH_TO_CLRD);
-		AddPopupListElement(STATUS_DESC_WFPU, "", FUNC_SWITCH_TO_WFPU);
-		AddPopupListElement(STATUS_DESC_PUSH, "", FUNC_SWITCH_TO_PUSH);
-		AddPopupListElement(STATUS_DESC_WFTX, "", FUNC_SWITCH_TO_WFTX);
-		AddPopupListElement(STATUS_DESC_TAXI, "", FUNC_SWITCH_TO_TAXI);
-		AddPopupListElement(STATUS_DESC_WFTO, "", FUNC_SWITCH_TO_WFTO);
-		AddPopupListElement(STATUS_DESC_TKOF, "", FUNC_SWITCH_TO_TOGA);
+		openStatusAsignMenu(area, fp);
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_SELECT:
-		if (!thisAc) return;
-		if (thisAc->status == AIRCRAFT_STATUS_NULL) return;
-		OpenPopupList(area, "PUT BEFORE", 2);
-		AddPopupListElement(SEQUENCE_TAGFUNC_REORDER_TOPKEY, "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
-		for (auto& aircraft : list)
-		{
-			std::string cs = aircraft["callsign"];
-			if (aircraft["status"] == thisAc->status && cs != thisAc->callsign) AddPopupListElement(cs.c_str(), "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
-		}
+		reorderAircraftBySelect(thisAc, area, ap);
 		break;
 	case SEQUENCE_TAGITEM_FUNC_REORDER_EDITED:
-		if (!thisAc) return;
-		logToFile("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
-		logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-		if (!logonCode)
-		{
-			log(ERR_LOGON_CODE_NULLREF);
-			return;
-		}
-		if (sItemString == SEQUENCE_TAGFUNC_REORDER_TOPKEY)
-		{
-			beforeKey = "-1";
-		}
-		else
-		{
-			beforeKey = sItemString;
-		}
-		logToFile("Creating an new thread for reorder request");
-		reOrderThread = new std::thread([beforeKey, fp, this] {
-			httplib::Client req(SERVER_ADDRESS_PRC);
-			req.set_connection_timeout(10, 0);
-			std::string ap = fp.GetFlightPlanData().GetOrigin();
-			json reqBody = {
-				{JSON_KEY_CALLSIGN, fp.GetCallsign()},
-				{JSON_KEY_BEFORE, beforeKey}
-			};
-			if (auto res = req.Patch(SERVER_RESTFUL_VER + ap + "/order", {{HEADER_LOGON_KEY, logonCode}}, reqBody.dump(), "application/json"))
-			{
-				if (res->status == 200)
-				{
-					setQueueFromJson(ap, res->body);
-				}
-			}
-			else
-			{
-				log(httplib::to_string(res.error()));
-			}
-			});
-		logToFile("Detaching reorder thread");
-		reOrderThread->detach();
-		logToFile("reorder thread detached");
+		reorderAircraftByEditHandler(thisAc, fp, sItemString);
 		break;
 	case FUNC_SWITCH_TO_WFCR:
 		logToFile("Function: FUNC_SWITCH_TO_WFCR was called");
-		PatchStatus(fp, AIRCRAFT_STATUS_WFCR);
+		PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFCR);
 		break;
 	case FUNC_SWITCH_TO_CLRD:
 		logToFile("Function: FUNC_SWITCH_TO_CLRD was called");
-		PatchStatus(fp, AIRCRAFT_STATUS_CLRD);
+		PatchAircraftStatus(fp, AIRCRAFT_STATUS_CLRD);
 		break;
 	case FUNC_SWITCH_TO_WFPU:
 		logToFile("Function: FUNC_SWITCH_TO_WFPU was called");
-		PatchStatus(fp, AIRCRAFT_STATUS_WFPU);
+		PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFPU);
 		break;
 	case FUNC_SWITCH_TO_PUSH:
 		logToFile("Function: FUNC_SWITCH_TO_PUSH was called");
-		PatchStatus(fp, AIRCRAFT_STATUS_PUSH);
+		PatchAircraftStatus(fp, AIRCRAFT_STATUS_PUSH);
 		break;
 	case FUNC_SWITCH_TO_WFTX:
 		logToFile("Function: FUNC_SWITCH_TO_WFTX was called");
-		PatchStatus(fp, AIRCRAFT_STATUS_WFTX);
+		PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFTX);
 		break;
 	case FUNC_SWITCH_TO_TAXI:
 		logToFile("Function: FUNC_SWITCH_TO_TAXI was called");
-		PatchStatus(fp, AIRCRAFT_STATUS_TAXI);
+		PatchAircraftStatus(fp, AIRCRAFT_STATUS_TAXI);
 		break;
 	case FUNC_SWITCH_TO_WFTO:
 		logToFile("Function: FUNC_SWITCH_TO_WFTO was called");
-		PatchStatus(fp, AIRCRAFT_STATUS_WFTO);
+		PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFTO);
 		break;
 	case FUNC_SWITCH_TO_TOGA:
 		logToFile("Function: FUNC_SWITCH_TO_TOGA was called");
-		PatchStatus(fp, AIRCRAFT_STATUS_TOGA);
+		PatchAircraftStatus(fp, AIRCRAFT_STATUS_TOGA);
 		break;
 	default:
 		break;
@@ -474,15 +498,21 @@ auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 	}
 }
 
+auto UniSequence::isTagItemValid(int itemCode, CFlightPlan fp, CRadarTarget rt) -> bool
+{
+	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return false;// Check if item code is what we need to handle
+
+	if (!fp.IsValid()) return false;// Check if the flight plan of this tag is valid
+
+	if (rt.IsValid() && rt.GetGS() > 50) return false;// If the radar target is valid and ground speed greater than 50kts, remove this aircraft cause it's taking off
+
+	return true;
+}
+
 auto UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, int tagData,
 	char sItemString[16], int* pColorCode, COLORREF* pRGB, double* pFontSize) -> void
 {
-	
-	if (itemCode != SEQUENCE_TAGITEM_TYPE_CODE) return;// Check if item code is what we need to handle
-	
-	if (!fp.IsValid()) return;// Check if the flight plan of this tag is valid
-	
-	if (rt.IsValid() && rt.GetGS() > 50) return;// If the radar target is valid and ground speed greater than 50kts, remove this aircraft cause it's taking off
+	if (!isTagItemValid(itemCode, fp, rt)) return;
 	
 	std::string depAirport = fp.GetFlightPlanData().GetOrigin();// Get departure airport from flight plan object
 

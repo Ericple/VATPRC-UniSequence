@@ -28,7 +28,7 @@ using namespace EuroScopePlugIn;
 #define SEQUENCE_TAGFUNC_REORDER_INPUT "Reorder Input"
 #define SEQUENCE_TAGITEM_FUNC_REORDER_EDITED 94
 #define SEQUENCE_TAGITEM_FUNC_REORDER_SELECT 188
-#define SEQUENCE_TAGFUNC_REORDER_SELECT "Reorder List (Preview)"
+#define SEQUENCE_TAGFUNC_REORDER_SELECT "Reorder List (Recommend!)"
 #define FUNC_SWITCH_TO_WFCR 84
 #define FUNC_SWITCH_TO_CLRD 86
 #define FUNC_SWITCH_TO_WFPU 93
@@ -104,7 +104,7 @@ typedef struct SequenceNode {
 	std::string callsign, origin;
 	int status, sequenceNumber;
 	bool seqNumUpdated;
-} SeqN;
+} SeqNode;
 
 typedef struct AirportSocket {
 	std::string icao;
@@ -123,13 +123,13 @@ public:
 	auto log(std::string) -> void;
 	auto closeLogStream(void) -> void;
 	auto logToFile(std::string) -> void;
-	auto GetFromList(CFlightPlan) -> SeqN*;
-	auto PatchStatus(CFlightPlan, int) -> void;
+	auto GetManagedAircraft(CFlightPlan) -> SeqNode*;
+	auto PatchAircraftStatus(CFlightPlan, int) -> void;
 	virtual auto OnCompileCommand(const char*) -> bool;
 	virtual auto OnGetTagItem(CFlightPlan, CRadarTarget, 
 		int, int, char[16], int*, COLORREF*, double*) -> void;
-	auto setQueueFromJson(const std::string&, const std::string&) -> void;
 	virtual auto OnFunctionCall(int, const char*, POINT, RECT) -> void;
+	auto setQueueFromJson(const std::string&, const std::string&) -> void;
 private:
 	int timerInterval = 5;
 	const char* logonCode;
@@ -139,6 +139,12 @@ private:
 	auto initUpdateChckThread(void) -> void;
 	auto customCommandHanlder(std::string) -> bool;
 	auto AddAirportIfNotExist(const std::string&) -> void;
+	auto commandMatch(const std::string&, const char*) -> bool;
+	auto reorderAircraftByEdit(RECT) -> void;
+	auto reorderAircraftByEditHandler(SeqNode*, CFlightPlan, const char*) -> void;
+	auto reorderAircraftBySelect(SeqNode*, RECT, const std::string&) -> void;
+	auto openStatusAsignMenu(RECT, CFlightPlan) -> void;
+	auto isTagItemValid(int, CFlightPlan, CRadarTarget) -> bool;
 #ifdef USE_WEBSOCKET
 	std::thread* wsSyncThread;
 	auto initWsThread(void) -> void;
@@ -146,7 +152,5 @@ private:
 	thread* dataSyncThread;
 	auto initDataSyncThread(void) -> void;
 #endif
-
-	
 };
 

@@ -27,7 +27,8 @@ auto UniSequence::InitWsThread(void) -> void
 				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
 				if (std::find_if(socket_list_.begin(), socket_list_.end(), airport_socket) == socket_list_.end())
 				{
-					int id = endpoint.connect(WS_ADDRESS_PRC + restfulVer + airport + "/ws", airport);
+					
+					int id = endpoint.connect(std::format("{}{}{}/ws", WS_ADDRESS_PRC, restfulVer, airport), airport);
 					if (id >= 0)
 					{
 						socket_list_.push_back({ airport, id });
@@ -223,7 +224,8 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 			{
 				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
 				{
-					LogToFile("Adding " + item + " to airport list");
+
+					LogToFile(std::format("Adding {} to airport list", item));
 					airport_list_.push_back(item);
 				}
 			}
@@ -233,7 +235,7 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 		}
 		catch (std::runtime_error const& e)
 		{
-			LogToES("Error: " + *e.what());
+			LogToES(std::format("Error: {}", e.what()));
 		}
 		return true;
 	}
@@ -260,7 +262,7 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 			{
 				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
 				{
-					LogToFile("Saving logon code: " + item + " to settings");
+					LogToFile(std::format("Saving logon code: {} to settings", item));
 					std::string lowercode = item.c_str();
 					transform(lowercode.begin(), lowercode.end(), lowercode.begin(), ::tolower);
 					SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, lowercode.c_str());
@@ -271,7 +273,7 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 		}
 		catch (std::runtime_error const& e)
 		{
-			LogToES("Error: " + *e.what());
+			LogToES(std::format("Error: {}", e.what()));
 		}
 		return true;
 	}
@@ -281,7 +283,7 @@ auto UniSequence::OnCompileCommand(const char* sCommandLine) -> bool
 {
 	std::string cmd = sCommandLine;
 	std::regex unisRegex(".");
-	LogToFile("Command received: " + cmd);
+	LogToFile(std::format("Command received: ", cmd));
 	transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
 	return CustomCommandHanlder(cmd);
 }
@@ -304,7 +306,7 @@ auto UniSequence::PatchAircraftStatus(CFlightPlan fp, int status) -> void
 		httplib::Client patchReq(SERVER_ADDRESS_PRC);
 		patchReq.set_connection_timeout(10, 0);
 		std::string ap = fp.GetFlightPlanData().GetOrigin();
-		if (auto result = patchReq.Patch(SERVER_RESTFUL_VER + ap + "/status", {{HEADER_LOGON_KEY, logon_code_}}, reqBody.dump().c_str(), "application/json"))
+		if (auto result = patchReq.Patch(std::format("{}{}/status", SERVER_RESTFUL_VER, ap) , {{HEADER_LOGON_KEY, logon_code_}}, reqBody.dump().c_str(), "application/json"))
 		{
 			if (result->status == 200)
 			{
@@ -370,7 +372,7 @@ auto UniSequence::OpenStatusAsignMenu(RECT area, CFlightPlan fp) -> void
 	AddPopupListElement(STATUS_DESC_TKOF, "", FUNC_SWITCH_TO_TOGA);
 }
 
-auto UniSequence::ReorderAircraftBySelect(SeqNode* thisAc, RECT area, const std::string& ap) -> void
+auto UniSequence::ReorderAircraftBySelect(std::unique_ptr<SeqNode> thisAc, RECT area, const std::string& ap) -> void
 {
 	json list = queue_caches_[ap];
 	if (!thisAc) return;
@@ -384,7 +386,7 @@ auto UniSequence::ReorderAircraftBySelect(SeqNode* thisAc, RECT area, const std:
 	}
 }
 
-auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, const char* sItemString) -> void
+auto UniSequence::ReorderAircraftEditHandler(std::unique_ptr<SeqNode> thisAc, CFlightPlan fp, const char* sItemString) -> void
 {
 	std::string beforeKey;
 	std::thread* reOrderThread;
@@ -439,7 +441,7 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
-	SeqNode* thisAc = GetManagedAircraft(fp);
+	std::unique_ptr<SeqNode> thisAc = std::make_unique<SeqNode>(GetManagedAircraft(fp));
 	std::string ap = fp.GetFlightPlanData().GetOrigin();
 	
 	

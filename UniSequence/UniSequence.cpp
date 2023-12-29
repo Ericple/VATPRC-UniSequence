@@ -372,7 +372,7 @@ auto UniSequence::OpenStatusAsignMenu(RECT area, CFlightPlan fp) -> void
 	AddPopupListElement(STATUS_DESC_TKOF, "", FUNC_SWITCH_TO_TOGA);
 }
 
-auto UniSequence::ReorderAircraftBySelect(std::unique_ptr<SeqNode> thisAc, RECT area, const std::string& ap) -> void
+auto UniSequence::ReorderAircraftBySelect(SeqNode* thisAc, RECT area, const std::string& ap) -> void
 {
 	json list = queue_caches_[ap];
 	if (!thisAc) return;
@@ -386,7 +386,7 @@ auto UniSequence::ReorderAircraftBySelect(std::unique_ptr<SeqNode> thisAc, RECT 
 	}
 }
 
-auto UniSequence::ReorderAircraftEditHandler(std::unique_ptr<SeqNode> thisAc, CFlightPlan fp, const char* sItemString) -> void
+auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, const char* sItemString) -> void
 {
 	std::string beforeKey;
 	std::thread* reOrderThread;
@@ -441,9 +441,8 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	CFlightPlan fp;
 	fp = FlightPlanSelectASEL();
 	if (!fp.IsValid()) return;
-	std::unique_ptr<SeqNode> thisAc = std::make_unique<SeqNode>(GetManagedAircraft(fp));
-	std::string ap = fp.GetFlightPlanData().GetOrigin();
-	
+	auto thisAc = GetManagedAircraft(fp);
+	auto ap = fp.GetFlightPlanData().GetOrigin();
 	
 	switch (fId)
 	{
@@ -494,7 +493,6 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	default:
 		break;
 	}
-	delete thisAc;
 }
 
 auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void

@@ -122,26 +122,30 @@ class UniSequence : public CPlugIn
 public:
 	UniSequence();
 	~UniSequence();
+
 	std::ofstream log_stream_;
 	std::vector<ASocket> socket_list_;
-	std::mutex queue_cache_lock_, log_lock_;
 	std::vector<std::string> airport_list_;
+	std::mutex log_lock_;
+	std::shared_mutex queue_cache_lock_, airport_list_lock_, socket_list_lock_;
+
 	auto LogToES(std::string) -> void;
 	auto LogToFile(std::string) -> void;
 	auto GetManagedAircraft(CFlightPlan) -> SeqNode*;
 	auto PatchAircraftStatus(CFlightPlan, int) -> void;
 	virtual auto OnCompileCommand(const char*) -> bool;
-	virtual auto OnGetTagItem(CFlightPlan, CRadarTarget, 
+	virtual auto OnGetTagItem(CFlightPlan, CRadarTarget,
 		int, int, char[16], int*, COLORREF*, double*) -> void;
 	virtual auto OnFunctionCall(int, const char*, POINT, RECT) -> void;
 	auto SetQueueFromJson(const std::string&, const std::string&) -> void;
+
 private:
 	int timer_interval_ = 5;
 	std::string logon_code_;
-	nlohmann::json queue_caches_;
-	bool sync_thread_flag_ = true;
-	bool update_check_flag_ = true;
-	std::thread* update_check_thread_;
+	nlohmann::json queue_caches_; // has a shared_lock
+	std::atomic_bool sync_thread_flag_ = true;
+	std::atomic_bool update_check_flag_ = true;
+
 	auto InitTagItem(void) -> void;
 	auto InitializeLogEnv(void) -> void;
 	auto InitUpdateChckThread(void) -> void;
@@ -153,7 +157,6 @@ private:
 	auto ReorderAircraftBySelect(SeqNode*, RECT, const std::string&) -> void;
 	auto ReorderAircraftEditHandler(SeqNode*, CFlightPlan, const char*) -> void;
 #ifdef USE_WEBSOCKET
-	std::thread* ws_sync_thread_;
 	auto InitWsThread(void) -> void;
 #else
 	thread* dataSyncThread;

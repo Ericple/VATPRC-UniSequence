@@ -15,54 +15,60 @@ auto UniSequence::LogToFile(std::string message) -> void
 }
 
 #ifdef USE_WEBSOCKET
+
 auto UniSequence::InitWsThread(void) -> void
 {
-	ws_sync_thread_ = new std::thread([&] {
+	std::thread([&] {
 		websocket_endpoint endpoint(this);
 		std::string restfulVer = SERVER_RESTFUL_VER;
 		while (sync_thread_flag_)
 		{
-			for (auto& airport : airport_list_)
 			{
-				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
-				if (std::find_if(socket_list_.begin(), socket_list_.end(), airport_socket) == socket_list_.end())
+				std::shared_lock<std::shared_mutex> airportLock(airport_list_lock_);
+				std::unique_lock<std::shared_mutex> socketLock(socket_list_lock_);
+				for (auto& airport : airport_list_)
 				{
+					const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
+					if (std::find_if(socket_list_.begin(), socket_list_.end(), airport_socket) == socket_list_.end())
+					{
 
-					int id = endpoint.connect(std::format("{}{}{}/ws", WS_ADDRESS_PRC, restfulVer, airport), airport);
-					if (id >= 0)
-					{
-						socket_list_.push_back({ airport, id });
-						LogToES(std::format("Ws connection established, fetching data of ", airport));
-					}
-					else
-					{
-						LogToES("Ws connection failed.");
+						int id = endpoint.connect(std::format("{}{}{}/ws", WS_ADDRESS_PRC, restfulVer, airport), airport);
+						if (id >= 0)
+						{
+							socket_list_.push_back({ airport, id });
+							LogToES(std::format("Ws connection established, fetching data of {}", airport));
+						}
+						else
+						{
+							LogToES("Ws connection failed.");
+						}
 					}
 				}
-			}
-			// Delete airports that no longer exist in the local airport list
-			for (auto& socket : socket_list_)
-			{
-				const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport; };
-				if (std::find_if(airport_list_.begin(), airport_list_.end(), airport_socket) == airport_list_.end()) {
-					endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
+				// Delete airports that no longer exist in the local airport list
+				for (auto& socket : socket_list_)
+				{
+					const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport; };
+					if (std::find_if(airport_list_.begin(), airport_list_.end(), airport_socket) == airport_list_.end()) {
+						endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
+					}
 				}
-			}
-			// If there is a disconnection in ws, remove this socket from the list directly.
-			socket_list_.erase(
-				std::remove_if(
-					socket_list_.begin(),
-					socket_list_.end(),
-					[&](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
-				),
-				socket_list_.end()
-			);
+				// If there is a disconnection in ws, remove this socket from the list directly.
+				socket_list_.erase(
+					std::remove_if(
+						socket_list_.begin(),
+						socket_list_.end(),
+						[&](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
+					),
+					socket_list_.end()
+				);
+			} // unlocked
 			std::this_thread::sleep_for(std::chrono::seconds(5));
 		}
-		});
-	ws_sync_thread_->detach();
+		}).detach();
 }
+
 #else
+
 auto UniSequence::initDataSyncThread(void) -> void
 {
 	dataSyncThread = new thread([&] {
@@ -109,10 +115,12 @@ auto UniSequence::initDataSyncThread(void) -> void
 	// detached anyway
 	dataSyncThread->detach();
 }
+
 #endif
+
 auto UniSequence::InitUpdateChckThread(void) -> void
 {
-	update_check_thread_ = new std::thread([&] {
+	std::thread([&] {
 		httplib::Client updateReq(GITHUB_UPDATE);
 		updateReq.set_connection_timeout(10, 0);
 		LogToES("Start updates check routine.");
@@ -140,8 +148,7 @@ auto UniSequence::InitUpdateChckThread(void) -> void
 				LogToES(std::format("Error occured while checking updates - {}", httplib::to_string(result.error())));
 			}
 		}
-		});
-	update_check_thread_->detach();
+		}).detach();
 }
 
 auto UniSequence::InitializeLogEnv(void) -> void
@@ -182,8 +189,6 @@ UniSequence::~UniSequence(void)
 {
 	sync_thread_flag_ = false;
 	update_check_flag_ = false;
-	delete update_check_thread_;
-	delete ws_sync_thread_;
 }
 
 auto UniSequence::LogToES(std::string message) -> void
@@ -212,6 +217,7 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 		LogToFile("command \".SQA\" acknowledged.");
 		try
 		{
+			std::unique_lock<std::shared_mutex> airportLock(airport_list_lock_);
 			LogToFile("Spliting cmd");
 			std::stringstream ss(cmd);
 			char delim = ' ';
@@ -242,6 +248,7 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 	{
 		LogToFile("command \".SQP\" acknowledged.");
 		LogToES("Current in list: ");
+		std::shared_lock<std::shared_mutex> airportLock(airport_list_lock_);
 		LogToES(std::to_string(airport_list_.size()));
 		return true;
 	}
@@ -330,7 +337,7 @@ auto UniSequence::PatchAircraftStatus(CFlightPlan fp, int status) -> void
 
 auto UniSequence::SetQueueFromJson(const std::string& airport, const std::string& content) -> void
 {
-	std::lock_guard<std::mutex> guard(queue_cache_lock_);
+	std::unique_lock<std::shared_mutex> lock(queue_cache_lock_);
 	queue_caches_[airport] = json::parse(content)["data"];
 }
 
@@ -339,7 +346,11 @@ auto UniSequence::GetManagedAircraft(CFlightPlan fp) -> SeqNode*
 	int seqNum = 1;
 	int status = AIRCRAFT_STATUS_NULL;
 	std::string airport = fp.GetFlightPlanData().GetOrigin();
-	json list = queue_caches_[airport];
+	json list;
+	{
+		std::shared_lock<std::shared_mutex> lock(queue_cache_lock_);
+		list = queue_caches_[airport];
+	}
 	for (auto& node : list)
 	{
 		if (node["callsign"] == fp.GetCallsign())
@@ -374,8 +385,12 @@ auto UniSequence::OpenStatusAsignMenu(RECT area, CFlightPlan fp) -> void
 
 auto UniSequence::ReorderAircraftBySelect(SeqNode* thisAc, RECT area, const std::string& ap) -> void
 {
-	json list = queue_caches_[ap];
-	if (!thisAc) return;
+	json list;
+	{
+		std::shared_lock<std::shared_mutex> lock(queue_cache_lock_);
+		list = queue_caches_[ap];
+	}
+	if (thisAc == nullptr) return;
 	if (thisAc->status == AIRCRAFT_STATUS_NULL) return;
 	OpenPopupList(area, "PUT BEFORE", 2);
 	AddPopupListElement(SEQUENCE_TAGFUNC_REORDER_TOPKEY, "", SEQUENCE_TAGITEM_FUNC_REORDER_EDITED);
@@ -389,8 +404,7 @@ auto UniSequence::ReorderAircraftBySelect(SeqNode* thisAc, RECT area, const std:
 auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, const char* sItemString) -> void
 {
 	std::string beforeKey = sItemString;
-	std::thread* reOrderThread;
-	if (!thisAc) return;
+	if (thisAc == nullptr) return;
 	LogToFile("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
 	auto logon_code_setting = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
 	logon_code_ = logon_code_setting != nullptr ? logon_code_setting : "";
@@ -404,7 +418,7 @@ auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, co
 		beforeKey = "-1";
 	}
 	LogToFile("Creating an new thread for reorder request");
-	reOrderThread = new std::thread([beforeKey, fp, this, reOrderThread] {
+	std::thread([beforeKey, fp, this] {
 		httplib::Client req(SERVER_ADDRESS_PRC);
 		req.set_connection_timeout(10, 0);
 		std::string ap = fp.GetFlightPlanData().GetOrigin();
@@ -418,17 +432,16 @@ auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, co
 			if (res->status == 200)
 			{
 				SetQueueFromJson(ap, res->body);
-				delete reOrderThread;
+				return;
 			}
 		}
 		else
 		{
 			LogToES(httplib::to_string(res.error()));
-			delete reOrderThread;
+			return;
 		}
-		});
-	LogToFile("Detaching reorder thread");
-	reOrderThread->detach();
+		}
+	).detach();
 	LogToFile("reorder thread detached");
 }
 
@@ -497,6 +510,7 @@ auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 	const auto& is_same_airport = [&](auto& airport) {
 		return airport == dep_airport;
 		};
+	std::unique_lock<std::shared_mutex> airportLock(airport_list_lock_);
 	if (std::find_if(airport_list_.cbegin(), airport_list_.cend(), is_same_airport) == airport_list_.cend()) {
 		LogToFile(std::format("Airport {} is not in the list.", dep_airport));
 		airport_list_.push_back(dep_airport);
@@ -517,9 +531,13 @@ auto UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 
 	int status = AIRCRAFT_STATUS_NULL;// For iterate use below
 
-	json list = queue_caches_[depAirport];// For iterate use below
-
 	bool seqadd = true;// For iterate use below
+
+	json list; // For iterate use below
+	{
+		std::shared_lock<std::shared_mutex> lock(queue_cache_lock_);
+		list = queue_caches_[depAirport];
+	}
 
 	for (auto& node : list)// Iterate each node in queue fetched from server
 	{

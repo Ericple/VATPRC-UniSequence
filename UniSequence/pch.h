@@ -27,6 +27,7 @@
 // threading
 #include <thread>
 #include <mutex>
+#include <shared_mutex>
 #include <atomic>
 // container
 #include <map>

@@ -2,6 +2,8 @@
 #include "UniSequence.h"
 #ifdef USE_WEBSOCKET
 
+typedef websocketpp::client<websocketpp::config::asio_client> client;
+
 class connection_metadata
 {
 public:

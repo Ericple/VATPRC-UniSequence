@@ -6,33 +6,33 @@
 #define USE_WEBSOCKET
 
 #include "framework.h"
-#include <iostream>
-#include <WinUser.h>
+
 #ifdef USE_WEBSOCKET
 #include "websocketpp/config/asio_no_tls_client.hpp"
 #include "websocketpp/client.hpp"
 #include "websocketpp/common/thread.hpp"
 #include "websocketpp/common/memory.hpp"
-typedef websocketpp::client<websocketpp::config::asio_client> client;
 #endif
-#include <mutex>
-#include <locale>
-#include <codecvt>
-#include <cstdlib>
-#include <string>
-#include "include/httplib.h"
-#include <Windows.h>
+
+// external deps
 #include "include/EuroScopePlugIn.h"
-#include <fstream>
-#include <time.h>
-#include <algorithm>
+#include "include/httplib.h"
 #include "include/json.hpp"
-#include <future>
-#include <map>
-#include <list>
-#include <vector>
-#include <thread>
+
+// file
+#include <fstream>
+// string
+#include <string>
 #include <regex>
+// threading
+#include <thread>
+#include <mutex>
+#include <atomic>
+// container
+#include <map>
+#include <vector>
+// others
+#include <algorithm>
 
 
 

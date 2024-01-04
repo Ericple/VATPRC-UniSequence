@@ -184,7 +184,6 @@ UniSequence::~UniSequence(void)
 	update_check_flag_ = false;
 	delete update_check_thread_;
 	delete ws_sync_thread_;
-	delete logon_code_;
 }
 
 auto UniSequence::LogToES(std::string message) -> void
@@ -292,8 +291,9 @@ auto UniSequence::PatchAircraftStatus(CFlightPlan fp, int status) -> void
 {
 	std::string cs = fp.GetCallsign();
 	LogToFile(std::format("Attempting to patch status of {}", cs));
-	logon_code_ = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-	if (!logon_code_)
+	auto logon_code_setting = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
+	logon_code_ = logon_code_setting != nullptr ? logon_code_setting : "";
+	if (!logon_code_.size())
 	{
 		LogToES(ERR_LOGON_CODE_NULLREF);
 		return;
@@ -388,23 +388,20 @@ auto UniSequence::ReorderAircraftBySelect(SeqNode* thisAc, RECT area, const std:
 
 auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, const char* sItemString) -> void
 {
-	std::string beforeKey;
+	std::string beforeKey = sItemString;
 	std::thread* reOrderThread;
 	if (!thisAc) return;
 	LogToFile("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
-	logon_code_ = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-	if (!logon_code_)
+	auto logon_code_setting = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
+	logon_code_ = logon_code_setting != nullptr ? logon_code_setting : "";
+	if (!logon_code_.size())
 	{
 		LogToES(ERR_LOGON_CODE_NULLREF);
 		return;
 	}
-	if (sItemString == SEQUENCE_TAGFUNC_REORDER_TOPKEY)
-	{
+	if (beforeKey == SEQUENCE_TAGFUNC_REORDER_TOPKEY)
+	{ // to the moon
 		beforeKey = "-1";
-	}
-	else
-	{
-		beforeKey = sItemString;
 	}
 	LogToFile("Creating an new thread for reorder request");
 	reOrderThread = new std::thread([beforeKey, fp, this, reOrderThread] {

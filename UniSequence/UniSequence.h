@@ -137,7 +137,7 @@ public:
 	auto SetQueueFromJson(const std::string&, const std::string&) -> void;
 private:
 	int timer_interval_ = 5;
-	const char* logon_code_;
+	std::string logon_code_;
 	nlohmann::json queue_caches_;
 	bool sync_thread_flag_ = true;
 	bool update_check_flag_ = true;

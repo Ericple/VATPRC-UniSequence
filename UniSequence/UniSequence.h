@@ -104,8 +104,10 @@ constexpr auto LOG_FILE_NAME = "unilog.log";
 // Aircraft instance
 //===========================
 typedef struct SequenceNode {
-	std::string callsign, origin;
-	int status, sequenceNumber;
+	std::string callsign;
+	std::string origin;
+	int status;
+	int sequenceNumber;
 	bool seqNumUpdated;
 } SeqNode;
 
@@ -131,7 +133,7 @@ public:
 
 	auto LogToES(std::string) -> void;
 	auto LogToFile(std::string) -> void;
-	auto GetManagedAircraft(CFlightPlan) -> SeqNode*;
+	auto GetManagedAircraft(CFlightPlan) -> std::shared_ptr<SeqNode>;
 	auto PatchAircraftStatus(CFlightPlan, int) -> void;
 	virtual auto OnCompileCommand(const char*) -> bool;
 	virtual auto OnGetTagItem(CFlightPlan, CRadarTarget,
@@ -154,8 +156,8 @@ private:
 	auto OpenStatusAsignMenu(RECT, CFlightPlan) -> void;
 	auto AddAirportIfNotExist(const std::string&) -> void;
 	auto CommandMatch(const std::string&, const char*) -> bool;
-	auto ReorderAircraftBySelect(SeqNode*, RECT, const std::string&) -> void;
-	auto ReorderAircraftEditHandler(SeqNode*, CFlightPlan, const char*) -> void;
+	auto ReorderAircraftBySelect(std::shared_ptr<SeqNode>, RECT, const std::string&) -> void;
+	auto ReorderAircraftEditHandler(std::shared_ptr<SeqNode>, CFlightPlan, const char*) -> void;
 #ifdef USE_WEBSOCKET
 	auto InitWsThread(void) -> void;
 #else

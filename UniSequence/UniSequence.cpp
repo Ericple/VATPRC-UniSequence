@@ -341,7 +341,7 @@ auto UniSequence::SetQueueFromJson(const std::string& airport, const std::string
 	queue_caches_[airport] = json::parse(content)["data"];
 }
 
-auto UniSequence::GetManagedAircraft(CFlightPlan fp) -> SeqNode*
+auto UniSequence::GetManagedAircraft(CFlightPlan fp) -> std::shared_ptr<SeqNode>
 {
 	int seqNum = 1;
 	int status = AIRCRAFT_STATUS_NULL;
@@ -351,16 +351,18 @@ auto UniSequence::GetManagedAircraft(CFlightPlan fp) -> SeqNode*
 		std::shared_lock<std::shared_mutex> lock(queue_cache_lock_);
 		list = queue_caches_[airport];
 	}
+	std::shared_ptr<SeqNode> resNode;
 	for (auto& node : list)
 	{
 		if (node["callsign"] == fp.GetCallsign())
 		{
 			status = node["status"];
-			return new SeqNode{ node["callsign"], fp.GetFlightPlanData().GetOrigin(), status, seqNum, false };
+			resNode = std::make_shared<SeqNode>(node["callsign"], fp.GetFlightPlanData().GetOrigin(), status, seqNum, false);
+			break;
 		}
 		seqNum++;
 	}
-	return nullptr;
+	return resNode;
 }
 
 auto UniSequence::ReorderAircraftByEdit(RECT area) -> void
@@ -383,7 +385,7 @@ auto UniSequence::OpenStatusAsignMenu(RECT area, CFlightPlan fp) -> void
 	AddPopupListElement(STATUS_DESC_TKOF, "", FUNC_SWITCH_TO_TOGA);
 }
 
-auto UniSequence::ReorderAircraftBySelect(SeqNode* thisAc, RECT area, const std::string& ap) -> void
+auto UniSequence::ReorderAircraftBySelect(std::shared_ptr<SeqNode> thisAc, RECT area, const std::string& ap) -> void
 {
 	json list;
 	{
@@ -401,7 +403,7 @@ auto UniSequence::ReorderAircraftBySelect(SeqNode* thisAc, RECT area, const std:
 	}
 }
 
-auto UniSequence::ReorderAircraftEditHandler(SeqNode* thisAc, CFlightPlan fp, const char* sItemString) -> void
+auto UniSequence::ReorderAircraftEditHandler(std::shared_ptr<SeqNode> thisAc, CFlightPlan fp, const char* sItemString) -> void
 {
 	std::string beforeKey = sItemString;
 	if (thisAc == nullptr) return;

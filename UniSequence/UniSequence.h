@@ -13,7 +13,7 @@ constexpr auto SERVER_ADDRESS_WITH_PORT = "https://q.vatprc.net:443";
 constexpr auto SERVER_RESTFUL_VER = "/v1/";
 constexpr auto DIVISION = "VATPRC";
 constexpr auto PLUGIN_NAME = "UniSequence";
-constexpr auto PLUGIN_VER = "v2.0.4";
+constexpr auto PLUGIN_VER = "v2.0.5-nightly";
 constexpr auto PLUGIN_AUTHOR = "Ericple Garrison";
 constexpr auto PLUGIN_COPYRIGHT = "AGPL-3.0 license";
 #endif

@@ -366,3 +366,4 @@ FodyWeavers.xsd
 /UniSequence/NO_WSSL/UniSequence.tlog
 
 *.DS_Store
+vcpkg_installed/

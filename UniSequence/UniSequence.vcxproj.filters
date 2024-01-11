@@ -24,9 +24,6 @@
     <ClInclude Include="lib\include\EuroScopePlugIn.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="lib\include\json.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="UniSequence.h">
       <Filter>头文件</Filter>
     </ClInclude>

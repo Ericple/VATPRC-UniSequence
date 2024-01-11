@@ -7,17 +7,21 @@
 
 #include "framework.h"
 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#pragma comment (lib, "User32.lib") // to resolve libcrypto.lib(libcrypto-lib-cryptlib.obj) error LNK2019
+#endif
+
 #ifdef USE_WEBSOCKET
-#include "websocketpp/config/asio_no_tls_client.hpp"
-#include "websocketpp/client.hpp"
-#include "websocketpp/common/thread.hpp"
-#include "websocketpp/common/memory.hpp"
+#include <websocketpp/config/asio_no_tls_client.hpp>
+#include <websocketpp/client.hpp>
+#include <websocketpp/common/thread.hpp>
+#include <websocketpp/common/memory.hpp>
 #endif
 
 // external deps
-#include "include/EuroScopePlugIn.h"
-#include "include/httplib.h"
-#include "include/json.hpp"
+#include <EuroScopePlugIn.h>
+#include <httplib.h>
+#include <nlohmann/json.hpp>
 
 // file
 #include <fstream>
@@ -34,7 +38,5 @@
 #include <vector>
 // others
 #include <algorithm>
-
-
 
 #endif //PCH_H

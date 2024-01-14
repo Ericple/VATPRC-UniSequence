@@ -158,11 +158,7 @@ private:
 	auto CommandMatch(const std::string&, const char*) -> bool;
 	auto ReorderAircraftBySelect(std::shared_ptr<SeqNode>, RECT, const std::string&) -> void;
 	auto ReorderAircraftEditHandler(std::shared_ptr<SeqNode>, CFlightPlan, const char*) -> void;
-#ifdef USE_WEBSOCKET
 	auto InitWsThread(void) -> void;
-#else
-	thread* dataSyncThread;
-	auto initDataSyncThread(void) -> void;
-#endif
+
 };
 

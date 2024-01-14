@@ -14,8 +14,6 @@ auto UniSequence::LogToFile(std::string message) -> void
 	log_stream_.close();
 }
 
-#ifdef USE_WEBSOCKET
-
 auto UniSequence::InitWsThread(void) -> void
 {
 	std::thread([&] {
@@ -66,57 +64,6 @@ auto UniSequence::InitWsThread(void) -> void
 		}
 		}).detach();
 }
-
-#else
-
-auto UniSequence::initDataSyncThread(void) -> void
-{
-	dataSyncThread = new thread([&] {
-		httplib::Client requestClient(SERVER_ADDRESS_PRC);
-		requestClient.set_connection_timeout(5, 0);
-		while (syncThreadFlag)
-		{
-			try
-			{
-#ifdef PATCH_WITH_LOGON_CODE
-				logonCode = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-				if (!logonCode) return;
-#endif // PATCH_WITH_LOGON_CODE
-				for (auto& airport : airportList)
-				{
-					log("Sync data of " + airport);
-					if (auto result = requestClient.Get(SERVER_RESTFUL_VER + airport + "/queue"))
-					{
-						log("Data fetched, updating local sequence list");
-						json resObj = json::parse(result->body);
-						int seqNumber = 1;
-						for (auto& seqObj : resObj["data"])
-						{
-							SyncSeq(seqObj["callsign"], seqObj["status"]);
-							SyncSeqNum(seqObj["callsign"], seqNumber);
-							seqNumber++;
-						}
-						ClearUpdateFlag(airport);
-					}
-					else
-					{
-						Messager(httplib::to_string(result.error()));
-					}
-				}
-				this_thread::sleep_for(chrono::seconds(timerInterval));
-			}
-			catch (const std::exception& e)
-			{
-				Messager(e.what());
-			}
-		}
-		});
-	Messager("Start synchronizing sequence data with server.");
-	// detached anyway
-	dataSyncThread->detach();
-}
-
-#endif
 
 auto UniSequence::InitUpdateChckThread(void) -> void
 {

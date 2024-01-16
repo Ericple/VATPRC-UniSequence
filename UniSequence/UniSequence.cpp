@@ -558,7 +558,7 @@ auto UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 	switch (status)// Print correspond status string to sItemString
 	{
 	case AIRCRAFT_STATUS_NULL:
-		sprintf_s(sItemString, bufferSize, "%s", STATUS_TEXT_NULL);
+		sprintf_s(sItemString, 1, "%s", STATUS_TEXT_NULL);
 		break;
 	case AIRCRAFT_STATUS_WFCR:
 		sprintf_s(sItemString, bufferSize, STATUS_TEXT_FORMAT_STRING, seqNum, STATUS_TEXT_WFCR);

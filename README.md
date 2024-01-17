@@ -25,3 +25,7 @@ VATPRC-UniSequence aims to reduce the waste of frequency resources and controlle
 ## Hand book
 
 For more information (how to use for example), please refer to [github wiki of this project](https://github.com/Ericple/VATPRC-UniSequence/wiki/1.-Introduction)
+
+## Developing
+
+[Vcpkg](https://vcpkg.io/), either standalone or bundled with Visual Studio v17.6+, is required. Run `vcpkg integrate install` in Visual Studio CMD/Powershell and build directly.

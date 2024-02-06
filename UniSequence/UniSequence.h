@@ -11,6 +11,8 @@ constexpr auto SERVER_ADDRESS_PRC = "https://q.vatprc.net";
 constexpr auto WS_ADDRESS_PRC = "ws://q.vatprc.net";
 constexpr auto SERVER_ADDRESS_WITH_PORT = "https://q.vatprc.net:443";
 constexpr auto SERVER_RESTFUL_VER = "/v1/";
+constexpr auto SERVER_RESTFUL_TYPE_STATUS = "/status";
+constexpr auto SERVER_RESTFUL_TYPE_ORDER = "/order";
 constexpr auto DIVISION = "VATPRC";
 constexpr auto PLUGIN_NAME = "UniSequence";
 constexpr auto PLUGIN_VER = "v2.0.5-nightly";
@@ -119,6 +121,34 @@ typedef struct AirportSocket {
 	int socketId;
 } ASocket;
 
+//============================
+// Data needed to patch an aircraft
+//============================
+typedef struct PatchRequest {
+	std::string airport;
+	std::string reqType;
+	nlohmann::json reqBody;
+	// imply type by overloaded initialization
+	PatchRequest(EuroScopePlugIn::CFlightPlan fp, int status) :
+		reqType(SERVER_RESTFUL_TYPE_STATUS)
+	{
+		airport = fp.GetFlightPlanData().GetOrigin();
+		reqBody = {
+			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
+			{JSON_KEY_STATUS, status}
+		};
+	};
+	PatchRequest(EuroScopePlugIn::CFlightPlan fp, std::string before) :
+		reqType(SERVER_RESTFUL_TYPE_ORDER)
+	{
+		airport = fp.GetFlightPlanData().GetOrigin();
+		reqBody = {
+			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
+			{JSON_KEY_BEFORE, before}
+		};
+	};
+} PRequest;
+
 class UniSequence : public CPlugIn
 {
 public:
@@ -145,8 +175,15 @@ private:
 	int timer_interval_ = 5;
 	std::string logon_code_;
 	nlohmann::json queue_caches_; // has a shared_lock
-	std::atomic_bool sync_thread_flag_ = true;
-	std::atomic_bool update_check_flag_ = true;
+
+	// threading by task
+	std::jthread sync_thread;
+	std::jthread update_check_thread;
+	// patcher, need condition variable and a unified queue
+	std::jthread patch_request_thread;
+	std::condition_variable_any patch_status_condvar;
+	std::queue<PRequest> patch_request_queue;
+	std::mutex patch_request_queue_lock_;
 
 	auto InitTagItem(void) -> void;
 	auto InitializeLogEnv(void) -> void;
@@ -159,6 +196,7 @@ private:
 	auto ReorderAircraftBySelect(std::shared_ptr<SeqNode>, RECT, const std::string&) -> void;
 	auto ReorderAircraftEditHandler(std::shared_ptr<SeqNode>, CFlightPlan, const char*) -> void;
 	auto InitWsThread(void) -> void;
+	auto InitPatchThread(void) -> void;
 
 };
 

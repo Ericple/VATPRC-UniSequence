@@ -16,72 +16,81 @@ auto UniSequence::LogToFile(std::string message) -> void
 
 auto UniSequence::InitWsThread(void) -> void
 {
-	std::thread([&] {
+	sync_thread = std::jthread([&](std::stop_token stoken) {
 		websocket_endpoint endpoint(this);
-		std::string restfulVer = SERVER_RESTFUL_VER;
-		while (sync_thread_flag_)
+		std::mutex this_thread_lock_;
+		while (true)
 		{
+			std::unique_lock threadLock(this_thread_lock_);
+			std::condition_variable_any().wait_for(threadLock, stoken, std::chrono::seconds(5),
+				[] { return false; });
+			if (stoken.stop_requested()) return;
+			std::shared_lock<std::shared_mutex> airportLock(airport_list_lock_);
+			std::unique_lock<std::shared_mutex> socketLock(socket_list_lock_);
+			for (auto& airport : airport_list_)
 			{
-				std::shared_lock<std::shared_mutex> airportLock(airport_list_lock_);
-				std::unique_lock<std::shared_mutex> socketLock(socket_list_lock_);
-				for (auto& airport : airport_list_)
+				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
+				if (std::find_if(socket_list_.begin(), socket_list_.end(), airport_socket) == socket_list_.end())
 				{
-					const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
-					if (std::find_if(socket_list_.begin(), socket_list_.end(), airport_socket) == socket_list_.end())
-					{
 
-						int id = endpoint.connect(std::format("{}{}{}/ws", WS_ADDRESS_PRC, restfulVer, airport), airport);
-						if (id >= 0)
-						{
-							socket_list_.push_back({ airport, id });
-							LogToES(std::format("Ws connection established, fetching data of {}", airport));
-						}
-						else
-						{
-							LogToES("Ws connection failed.");
-						}
+					int id = endpoint.connect(std::format("{}{}{}/ws", WS_ADDRESS_PRC, SERVER_RESTFUL_VER, airport), airport);
+					if (id >= 0)
+					{
+						socket_list_.push_back({ airport, id });
+						LogToES(std::format("Ws connection established, fetching data of {}", airport));
+					}
+					else
+					{
+						LogToES("Ws connection failed.");
 					}
 				}
-				// Delete airports that no longer exist in the local airport list
-				for (auto& socket : socket_list_)
-				{
-					const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport; };
-					if (std::find_if(airport_list_.begin(), airport_list_.end(), airport_socket) == airport_list_.end()) {
-						endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
-					}
+			}
+			// Delete airports that no longer exist in the local airport list
+			for (auto& socket : socket_list_)
+			{
+				const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport; };
+				if (std::find_if(airport_list_.begin(), airport_list_.end(), airport_socket) == airport_list_.end()) {
+					endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
 				}
-				// If there is a disconnection in ws, remove this socket from the list directly.
-				socket_list_.erase(
-					std::remove_if(
-						socket_list_.begin(),
-						socket_list_.end(),
-						[&](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
-					),
-					socket_list_.end()
-				);
-			} // unlocked
-			std::this_thread::sleep_for(std::chrono::seconds(5));
+			}
+			// If there is a disconnection in ws, remove this socket from the list directly.
+			socket_list_.erase(
+				std::remove_if(
+					socket_list_.begin(),
+					socket_list_.end(),
+					[&](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
+				),
+				socket_list_.end()
+			);
+			// unlocked
 		}
-		}).detach();
+		});
 }
 
 auto UniSequence::InitUpdateChckThread(void) -> void
 {
-	std::thread([&] {
+	update_check_thread = std::jthread([&](std::stop_token stoken) {
 		httplib::Client updateReq(GITHUB_UPDATE);
 		updateReq.set_connection_timeout(10, 0);
-		LogToES("Start updates check routine.");
-		if (update_check_flag_) {
+		std::mutex this_thread_lock_;
+		int retryTime = 0;
+		while (retryTime < 3) { // allows maximum 3 retries
+			retryTime++;
+			LogToES(std::format("Checking for update, attmept #{}.", retryTime));
+			std::unique_lock threadLock(this_thread_lock_);
+			bool stopped = std::condition_variable_any().wait_for(threadLock, stoken, std::chrono::seconds(10),
+				[stoken] { return stoken.stop_requested(); });
+			if (stopped) return;
 			if (auto result = updateReq.Get(GITHUB_UPDATE_PATH)) {
 				json versionInfo = json::parse(result->body);
 				if (versionInfo.contains("message")) {
 					LogToES("Error occured while checking updates.");
 					LogToES(versionInfo["message"]);
-					return;
+					continue;
 				}
 				if (!versionInfo.is_array()) {
 					LogToES("Error occured while checking updates.");
-					return;
+					continue;
 				}
 				std::string versionTag = versionInfo[0]["tag_name"];
 				std::string versionName = versionInfo[0]["name"];
@@ -89,13 +98,61 @@ auto UniSequence::InitUpdateChckThread(void) -> void
 				if (versionTag != PLUGIN_VER) {
 					LogToES(std::format("Update is available! The latest version is: {} {} | Publish date: {}", versionName, versionTag, publishDate));
 				}
-				// Now, an update prompt will only appear when and only when there is an update, without indicating that this plugin is the latest version
+				else {
+					LogToES("No updates found.");
+				}
+				return; // update check completes
 			}
 			else {
 				LogToES(std::format("Error occured while checking updates - {}", httplib::to_string(result.error())));
 			}
 		}
-		}).detach();
+		});
+}
+
+auto UniSequence::InitPatchThread(void) -> void
+{
+	patch_request_thread = std::jthread([&](std::stop_token stoken) {
+		std::mutex this_thread_lock_;
+		while (!stoken.stop_requested())
+		{
+			std::unique_lock threadLock(this_thread_lock_);
+			bool is_queueing = patch_status_condvar.wait(threadLock, stoken,
+				[this, stoken] {
+					std::lock_guard queueLock(patch_request_queue_lock_);
+					return !patch_request_queue.empty() && !stoken.stop_requested();
+				});
+			if (!is_queueing) continue;
+			// deals with queue and send request sequentially
+			LogToFile("Getting the front of patch queue.");
+			std::unique_lock patchLock(patch_request_queue_lock_);
+			PRequest pReq = patch_request_queue.front();
+			patch_request_queue.pop();
+			patchLock.unlock();
+			// making request
+			LogToFile(std::format("Making patch request: airport={}, type={}, body={}",
+				pReq.airport, pReq.reqType, pReq.reqBody.dump()));
+			httplib::Client patchReq(SERVER_ADDRESS_PRC);
+			patchReq.set_connection_timeout(10, 0);
+			std::string ap = pReq.airport;
+			if (auto result = patchReq.Patch(std::format("{}{}{}", SERVER_RESTFUL_VER, ap, pReq.reqType), { {HEADER_LOGON_KEY, logon_code_} }, pReq.reqBody.dump(), "application/json"))
+			{
+				if (result->status == 200)
+				{
+					LogToFile("Patch successful with return. Setting queue from response.");
+					SetQueueFromJson(ap, result->body);
+				}
+				else if (result->status == 403)
+				{
+					LogToFile("Logon code verification failed.");
+				}
+			}
+			else
+			{
+				LogToFile(httplib::to_string(result.error()));
+			}
+		}
+		});
 }
 
 auto UniSequence::InitializeLogEnv(void) -> void
@@ -120,22 +177,21 @@ UniSequence::UniSequence(void) : CPlugIn(
 	// Registering a Tag Object for EuroScope
 	InitTagItem();
 
-	/*init communication thread*/
+	// Start threads
 #ifdef USE_WEBSOCKET
 	InitWsThread();
-#else
-	initDataSyncThread();
 #endif // USE_WEBSOCKET
-	// update check thread has been detached, so it's safe
 	InitUpdateChckThread();
+	InitPatchThread();
 
 	LogToES("Initialization complete.");
 }
 
 UniSequence::~UniSequence(void)
 {
-	sync_thread_flag_ = false;
-	update_check_flag_ = false;
+	sync_thread.request_stop();
+	update_check_thread.request_stop();
+	patch_request_thread.request_stop();
 }
 
 auto UniSequence::LogToES(std::string message) -> void
@@ -252,34 +308,11 @@ auto UniSequence::PatchAircraftStatus(CFlightPlan fp, int status) -> void
 		LogToES(ERR_LOGON_CODE_NULLREF);
 		return;
 	}
-	std::thread patchThread([fp, status, this] {
-		json reqBody = {
-			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
-			{JSON_KEY_STATUS, status}
-		};
-		httplib::Client patchReq(SERVER_ADDRESS_PRC);
-		patchReq.set_connection_timeout(10, 0);
-		std::string ap = fp.GetFlightPlanData().GetOrigin();
-		if (auto result = patchReq.Patch(std::format("{}{}/status", SERVER_RESTFUL_VER, ap), { {HEADER_LOGON_KEY, logon_code_} }, reqBody.dump().c_str(), "application/json"))
-		{
-			if (result->status == 200)
-			{
-				SetQueueFromJson(ap, result->body);
-			}
-			else
-			{
-				if (result->status == 403)
-				{
-					LogToES("Logon code verification failed.");
-				}
-			}
-		}
-		else
-		{
-			LogToES(ERR_CONN_FAILED);
-		}
-		});
-	patchThread.detach();
+	std::unique_lock patchLock(patch_request_queue_lock_);
+	PRequest pReq(fp, status);
+	patch_request_queue.push(pReq);
+	patchLock.unlock();
+	patch_status_condvar.notify_all();
 }
 
 auto UniSequence::SetQueueFromJson(const std::string& airport, const std::string& content) -> void
@@ -366,32 +399,11 @@ auto UniSequence::ReorderAircraftEditHandler(std::shared_ptr<SeqNode> thisAc, CF
 	{ // to the moon
 		beforeKey = "-1";
 	}
-	LogToFile("Creating an new thread for reorder request");
-	std::thread([beforeKey, fp, this] {
-		httplib::Client req(SERVER_ADDRESS_PRC);
-		req.set_connection_timeout(10, 0);
-		std::string ap = fp.GetFlightPlanData().GetOrigin();
-		json reqBody = {
-			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
-			{JSON_KEY_BEFORE, beforeKey}
-		};
-
-		if (auto res = req.Patch(std::format("{}{}/order", SERVER_RESTFUL_VER, ap), { {HEADER_LOGON_KEY, logon_code_} }, reqBody.dump(), "application/json"))
-		{
-			if (res->status == 200)
-			{
-				SetQueueFromJson(ap, res->body);
-				return;
-			}
-		}
-		else
-		{
-			LogToES(httplib::to_string(res.error()));
-			return;
-		}
-		}
-	).detach();
-	LogToFile("reorder thread detached");
+	std::unique_lock patchLock(patch_request_queue_lock_);
+	PRequest pReq(fp, beforeKey);
+	patch_request_queue.push(pReq);
+	patchLock.unlock();
+	patch_status_condvar.notify_all();
 }
 
 auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, RECT area) -> void

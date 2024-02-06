@@ -36,6 +36,7 @@
 // container
 #include <map>
 #include <vector>
+#include <queue>
 // others
 #include <algorithm>
 

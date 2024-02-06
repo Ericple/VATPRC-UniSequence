@@ -114,14 +114,6 @@ typedef struct SequenceNode {
 } SeqNode;
 
 //============================
-// Socket instance of an airport
-//============================
-typedef struct AirportSocket {
-	std::string icao;
-	int socketId;
-} ASocket;
-
-//============================
 // Data needed to patch an aircraft
 //============================
 typedef struct PatchRequest {
@@ -156,8 +148,8 @@ public:
 	~UniSequence();
 
 	std::ofstream log_stream_;
-	std::vector<ASocket> socket_list_;
-	std::vector<std::string> airport_list_;
+	std::map<std::string, int> socket_list_; // airport ICAO -> socket ID
+	std::set<std::string> airport_list_;
 	std::mutex log_lock_;
 	std::shared_mutex queue_cache_lock_, airport_list_lock_, socket_list_lock_;
 

@@ -29,14 +29,12 @@ auto UniSequence::InitWsThread(void) -> void
 			std::unique_lock<std::shared_mutex> socketLock(socket_list_lock_);
 			for (auto& airport : airport_list_)
 			{
-				const auto& airport_socket = [&](const auto& socket) { return socket.icao == airport; };
-				if (std::find_if(socket_list_.begin(), socket_list_.end(), airport_socket) == socket_list_.end())
+				if (!socket_list_.contains(airport))
 				{
-
 					int id = endpoint.connect(std::format("{}{}{}/ws", WS_ADDRESS_PRC, SERVER_RESTFUL_VER, airport), airport);
 					if (id >= 0)
 					{
-						socket_list_.push_back({ airport, id });
+						socket_list_.insert({ airport, id });
 						LogToES(std::format("Ws connection established, fetching data of {}", airport));
 					}
 					else
@@ -46,22 +44,16 @@ auto UniSequence::InitWsThread(void) -> void
 				}
 			}
 			// Delete airports that no longer exist in the local airport list
-			for (auto& socket : socket_list_)
-			{
-				const auto& airport_socket = [&](const auto& airport) { return socket.icao == airport; };
-				if (std::find_if(airport_list_.begin(), airport_list_.end(), airport_socket) == airport_list_.end()) {
-					endpoint.close(socket.socketId, websocketpp::close::status::normal, "Airport does not exist anymore");
+			for (auto socket_itr = socket_list_.begin(); socket_itr != socket_list_.end();) {
+				if (!airport_list_.contains(socket_itr->first)) {
+					// If there is a disconnection in ws, remove this socket from the list directly.
+					endpoint.close(socket_itr->second, websocketpp::close::status::normal, "Airport does not exist anymore");
+					socket_itr = socket_list_.erase(socket_itr);
+				}
+				else {
+					socket_itr++;
 				}
 			}
-			// If there is a disconnection in ws, remove this socket from the list directly.
-			socket_list_.erase(
-				std::remove_if(
-					socket_list_.begin(),
-					socket_list_.end(),
-					[&](const auto& socket) { return endpoint.get_metadata(socket.socketId).get()->get_status() == ""; }
-				),
-				socket_list_.end()
-			);
 			// unlocked
 		}
 		});
@@ -234,7 +226,7 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 				{
 
 					LogToFile(std::format("Adding {} to airport list", item));
-					airport_list_.push_back(item);
+					airport_list_.insert(item);
 				}
 			}
 			if (airport_list_.size() > 1) LogToES("Airports saved.");
@@ -474,7 +466,7 @@ auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 	std::unique_lock<std::shared_mutex> airportLock(airport_list_lock_);
 	if (std::find_if(airport_list_.cbegin(), airport_list_.cend(), is_same_airport) == airport_list_.cend()) {
 		LogToFile(std::format("Airport {} is not in the list.", dep_airport));
-		airport_list_.push_back(dep_airport);
+		airport_list_.insert(dep_airport);
 		LogToFile(std::format("Airport {} added.", dep_airport));
 	}
 }

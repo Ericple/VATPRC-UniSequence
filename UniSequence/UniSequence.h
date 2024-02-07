@@ -100,6 +100,9 @@ constexpr auto HEADER_LOGON_KEY = "Authorization";
 
 #ifndef LOGGER_RELATED
 constexpr auto LOG_FILE_NAME = "unilog.log";
+constexpr auto LOG_LEVEL_DEBG = 0;
+constexpr auto LOG_LEVEL_INFO = 1;
+constexpr auto LOG_LEVEL_NOTE = 2;
 #endif // !LOGGER_RELATED
 
 //===========================
@@ -153,8 +156,6 @@ public:
 	std::mutex log_lock_;
 	std::shared_mutex queue_cache_lock_, airport_list_lock_, socket_list_lock_;
 
-	auto LogToES(std::string) -> void;
-	auto LogToFile(std::string) -> void;
 	auto GetManagedAircraft(CFlightPlan) -> std::shared_ptr<SeqNode>;
 	auto PatchAircraftStatus(CFlightPlan, int) -> void;
 	virtual auto OnCompileCommand(const char*) -> bool;
@@ -177,6 +178,7 @@ private:
 	std::queue<PRequest> patch_request_queue;
 	std::mutex patch_request_queue_lock_;
 
+	auto LogMessage(const std::string&, const int& level = LOG_LEVEL_DEBG) -> void;
 	auto InitTagItem(void) -> void;
 	auto InitializeLogEnv(void) -> void;
 	auto InitUpdateChckThread(void) -> void;

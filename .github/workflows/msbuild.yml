@@ -20,6 +20,8 @@ env:
   # https://docs.github.com/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
   BUILD_CONFIGURATION: Debug
 
+  VCPKG_DEFAULT_TRIPLET: x86-windows
+
 permissions:
   contents: read
 
@@ -34,10 +36,12 @@ jobs:
       uses: microsoft/setup-msbuild@v1.1
 
     - name: run-vcpkg
-      uses: lukka/run-vcpkg@v11.4
+      uses: lukka/run-vcpkg@v11
+      with:
+        runVcpkgInstall: true
 
     - name: Build
-      working-directory: ${{env.GITHUB_WORKSPACE}}
+      working-directory: '${{ github.workspace }}'
       # Add additional options to the MSBuild command line here (like platform or verbosity level).
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}}

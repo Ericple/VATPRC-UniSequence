@@ -11,6 +11,8 @@ constexpr auto SERVER_ADDRESS_PRC = "https://q.vatprc.net";
 constexpr auto WS_ADDRESS_PRC = "ws://q.vatprc.net";
 constexpr auto SERVER_ADDRESS_WITH_PORT = "https://q.vatprc.net:443";
 constexpr auto SERVER_RESTFUL_VER = "/v1/";
+constexpr auto SERVER_RESTFUL_TYPE_STATUS = "/status";
+constexpr auto SERVER_RESTFUL_TYPE_ORDER = "/order";
 constexpr auto DIVISION = "VATPRC";
 constexpr auto PLUGIN_NAME = "UniSequence";
 constexpr auto PLUGIN_VER = "v2.0.5-nightly";
@@ -98,6 +100,9 @@ constexpr auto HEADER_LOGON_KEY = "Authorization";
 
 #ifndef LOGGER_RELATED
 constexpr auto LOG_FILE_NAME = "unilog.log";
+constexpr auto LOG_LEVEL_DEBG = 0;
+constexpr auto LOG_LEVEL_INFO = 1;
+constexpr auto LOG_LEVEL_NOTE = 2;
 #endif // !LOGGER_RELATED
 
 //===========================
@@ -112,12 +117,32 @@ typedef struct SequenceNode {
 } SeqNode;
 
 //============================
-// Socket instance of an airport
+// Data needed to patch an aircraft
 //============================
-typedef struct AirportSocket {
-	std::string icao;
-	int socketId;
-} ASocket;
+typedef struct PatchRequest {
+	std::string airport;
+	std::string reqType;
+	nlohmann::json reqBody;
+	// imply type by overloaded initialization
+	PatchRequest(EuroScopePlugIn::CFlightPlan fp, int status) :
+		reqType(SERVER_RESTFUL_TYPE_STATUS)
+	{
+		airport = fp.GetFlightPlanData().GetOrigin();
+		reqBody = {
+			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
+			{JSON_KEY_STATUS, status}
+		};
+	};
+	PatchRequest(EuroScopePlugIn::CFlightPlan fp, std::string before) :
+		reqType(SERVER_RESTFUL_TYPE_ORDER)
+	{
+		airport = fp.GetFlightPlanData().GetOrigin();
+		reqBody = {
+			{JSON_KEY_CALLSIGN, fp.GetCallsign()},
+			{JSON_KEY_BEFORE, before}
+		};
+	};
+} PRequest;
 
 class UniSequence : public CPlugIn
 {
@@ -126,13 +151,11 @@ public:
 	~UniSequence();
 
 	std::ofstream log_stream_;
-	std::vector<ASocket> socket_list_;
-	std::vector<std::string> airport_list_;
+	std::map<std::string, int> socket_list_; // airport ICAO -> socket ID
+	std::set<std::string> airport_list_;
 	std::mutex log_lock_;
 	std::shared_mutex queue_cache_lock_, airport_list_lock_, socket_list_lock_;
 
-	auto LogToES(std::string) -> void;
-	auto LogToFile(std::string) -> void;
 	auto GetManagedAircraft(CFlightPlan) -> std::shared_ptr<SeqNode>;
 	auto PatchAircraftStatus(CFlightPlan, int) -> void;
 	virtual auto OnCompileCommand(const char*) -> bool;
@@ -145,9 +168,17 @@ private:
 	int timer_interval_ = 5;
 	std::string logon_code_;
 	nlohmann::json queue_caches_; // has a shared_lock
-	std::atomic_bool sync_thread_flag_ = true;
-	std::atomic_bool update_check_flag_ = true;
 
+	// threading by task
+	std::jthread sync_thread;
+	std::jthread update_check_thread;
+	// patcher, need condition variable and a unified queue
+	std::jthread patch_request_thread;
+	std::condition_variable_any patch_status_condvar;
+	std::queue<PRequest> patch_request_queue;
+	std::mutex patch_request_queue_lock_;
+
+	auto LogMessage(const std::string&, const int& level = LOG_LEVEL_DEBG) -> void;
 	auto InitTagItem(void) -> void;
 	auto InitializeLogEnv(void) -> void;
 	auto InitUpdateChckThread(void) -> void;
@@ -159,6 +190,7 @@ private:
 	auto ReorderAircraftBySelect(std::shared_ptr<SeqNode>, RECT, const std::string&) -> void;
 	auto ReorderAircraftEditHandler(std::shared_ptr<SeqNode>, CFlightPlan, const char*) -> void;
 	auto InitWsThread(void) -> void;
+	auto InitPatchThread(void) -> void;
 
 };
 

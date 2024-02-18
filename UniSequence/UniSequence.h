@@ -99,7 +99,7 @@ constexpr auto HEADER_LOGON_KEY = "Authorization";
 #endif // !REQUEST_RELATED
 
 #ifndef LOGGER_RELATED
-constexpr auto LOG_FILE_NAME = "unilog.log";
+constexpr auto LOG_FILE_NAME = "uniseq.log";
 constexpr auto LOG_LEVEL_DEBG = 0;
 constexpr auto LOG_LEVEL_INFO = 1;
 constexpr auto LOG_LEVEL_NOTE = 2;
@@ -167,6 +167,7 @@ public:
 private:
 	int timer_interval_ = 5;
 	std::string logon_code_;
+	std::string log_file;
 	nlohmann::json queue_caches_; // has a shared_lock
 
 	// threading by task

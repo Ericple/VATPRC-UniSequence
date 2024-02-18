@@ -16,11 +16,13 @@ auto UniSequence::LogMessage(const std::string& message, const int& level) -> vo
 	}
 	// LOG_LEVEL_DEBG
 	std::lock_guard<std::mutex> guard(log_lock_);
-	if (!log_stream_.is_open()) {
-		log_stream_.open(LOG_FILE_NAME, std::ios::app);
+	if (log_file.size()) {
+		log_stream_.open(log_file, std::ios::app);
+		if (log_stream_.is_open()) {
+			log_stream_ << std::format("[{:%T}] {}", std::chrono::system_clock::now(), message) << std::endl;
+			log_stream_.close();
+		}
 	}
-	log_stream_ << std::format("[{:%T}] {}", std::chrono::system_clock::now(), message) << std::endl;
-	log_stream_.close();
 }
 
 auto UniSequence::InitWsThread(void) -> void
@@ -146,7 +148,7 @@ auto UniSequence::InitPatchThread(void) -> void
 				}
 				else if (result->status == 403)
 				{
-					LogMessage("Logon code verification failed.");
+					LogMessage("Logon code verification failed.", LOG_LEVEL_NOTE);
 				}
 			}
 			else
@@ -159,9 +161,15 @@ auto UniSequence::InitPatchThread(void) -> void
 
 auto UniSequence::InitializeLogEnv(void) -> void
 {
-	remove(LOG_FILE_NAME);
+	// find dll path
+	AFX_MANAGE_STATE(AfxGetStaticModuleState());
+	HMODULE pluginModule = AfxGetInstanceHandle();
+	TCHAR pBuffer[MAX_PATH] = { 0 };
+	GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
+	std::string currentPath = pBuffer;
+	log_file = currentPath.substr(0, currentPath.find_last_of("\\/") + 1) + LOG_FILE_NAME;
+	remove(log_file.c_str());
 	LogMessage("UniSequence initializing");
-	LogMessage("Attempting to register tag item type of \"Sequence\"");
 }
 auto UniSequence::InitTagItem(void) -> void
 {
@@ -169,6 +177,7 @@ auto UniSequence::InitTagItem(void) -> void
 	RegisterTagItemFunction(SEQUENCE_TAGFUNC_SWITCH_STATUS, SEQUENCE_TAGITEM_FUNC_SWITCH_STATUS_CODE);
 	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_INPUT, SEQUENCE_TAGITEM_FUNC_REORDER);
 	RegisterTagItemFunction(SEQUENCE_TAGFUNC_REORDER_SELECT, SEQUENCE_TAGITEM_FUNC_REORDER_SELECT);
+	LogMessage("Tag item type and functions are registered");
 }
 UniSequence::UniSequence(void) : CPlugIn(
 	EuroScopePlugIn::COMPATIBILITY_CODE,
@@ -220,13 +229,12 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 		try
 		{
 			std::unique_lock<std::shared_mutex> airportLock(airport_list_lock_);
-			LogMessage("Spliting cmd");
 			std::stringstream ss(cmd);
 			char delim = ' ';
 			std::string item;
-			LogMessage("Clearing airport list");
 			airport_list_.clear();
 			LogMessage("Airport list cleared");
+			std::string msg = "Active airports: ";
 			while (getline(ss, item, delim))
 			{
 				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
@@ -234,9 +242,10 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 
 					LogMessage(std::format("Adding {} to airport list", item));
 					airport_list_.insert(item);
+					msg += item + " ";
 				}
 			}
-			LogMessage(std::format("Airport {}.", airport_list_.size() ? "saved" : "cleared"), LOG_LEVEL_NOTE);
+			LogMessage(msg, LOG_LEVEL_NOTE);
 		}
 		catch (std::runtime_error const& e)
 		{
@@ -248,9 +257,9 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 	{
 		LogMessage("command \".SQP\" acknowledged.");
 		std::shared_lock<std::shared_mutex> airportLock(airport_list_lock_);
-		std::string msg = "Current in list:";
+		std::string msg = "Active airports: ";
 		for (const auto& a : airport_list_) {
-			msg += std::string(" ") + a;
+			msg += a + " ";
 		}
 		LogMessage(msg, LOG_LEVEL_NOTE);
 		return true;
@@ -260,11 +269,9 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 		LogMessage("command \".SQC\" acknowledged.");
 		try
 		{
-			LogMessage("Spliting cmd");
 			std::stringstream ss(cmd);
 			char delim = ' ';
 			std::string item;
-			LogMessage("Clearing airport list");
 			airport_list_.clear();
 			LogMessage("Airport list cleared");
 			while (getline(ss, item, delim))
@@ -278,7 +285,7 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 					LogMessage("Logon code saved.");
 				}
 			}
-			LogMessage(MSG_LOGON_CODE_SAVED, LOG_LEVEL_NOTE);
+			LogMessage(MSG_LOGON_CODE_SAVED, LOG_LEVEL_INFO);
 		}
 		catch (std::runtime_error const& e)
 		{

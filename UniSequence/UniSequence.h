@@ -81,7 +81,7 @@ constexpr auto STATUS_TEXT_FORMAT_STRING = "%02d%s";
 
 #ifndef PLUGIN_SETTING_KEYS
 constexpr auto PLUGIN_SETTING_KEY_LOGON_CODE = "logonstr";
-constexpr auto PLUGIN_SETTING_DESC_LOGON_CODE = "Your logon code for unisequence plugin to establish connection with vatprc server.";
+constexpr auto PLUGIN_SETTING_DESC_LOGON_CODE = "logon code for VATPRC";
 #endif // !PLUGIN_SETTING_KEYS
 
 #ifndef MESSAGE

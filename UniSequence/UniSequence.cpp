@@ -226,31 +226,21 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 	if (CommandMatch(cmd, ".SQA"))
 	{
 		LogMessage("command \".SQA\" acknowledged.");
-		try
+		std::unique_lock<std::shared_mutex> airportLock(airport_list_lock_);
+		std::stringstream ss(cmd);
+		char delim = ' ';
+		std::string item;
+		airport_list_.clear();
+		LogMessage("Airport list cleared");
+		std::string msg = "Active airports: ";
+		ss >> item; // skip .sqa here
+		while (ss >> item)
 		{
-			std::unique_lock<std::shared_mutex> airportLock(airport_list_lock_);
-			std::stringstream ss(cmd);
-			char delim = ' ';
-			std::string item;
-			airport_list_.clear();
-			LogMessage("Airport list cleared");
-			std::string msg = "Active airports: ";
-			while (getline(ss, item, delim))
-			{
-				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
-				{
-
-					LogMessage(std::format("Adding {} to airport list", item));
-					airport_list_.insert(item);
-					msg += item + " ";
-				}
-			}
-			LogMessage(msg, LOG_LEVEL_NOTE);
+			LogMessage(std::format("Adding {} to airport list", item));
+			airport_list_.insert(item);
+			msg += item + " ";
 		}
-		catch (std::runtime_error const& e)
-		{
-			LogMessage(std::format("Error: {}", e.what()), LOG_LEVEL_NOTE);
-		}
+		LogMessage(msg, LOG_LEVEL_NOTE);
 		return true;
 	}
 	if (CommandMatch(cmd, ".SQP"))
@@ -267,31 +257,18 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 	if (CommandMatch(cmd, ".SQC"))
 	{
 		LogMessage("command \".SQC\" acknowledged.");
-		try
-		{
-			std::stringstream ss(cmd);
-			char delim = ' ';
-			std::string item;
-			airport_list_.clear();
-			LogMessage("Airport list cleared");
-			while (getline(ss, item, delim))
-			{
-				if (!item.empty() && item[0] != '.')  // the command itself has been skiped here
-				{
-					LogMessage(std::format("Saving logon code: {} to settings", item));
-					std::string lowercode = item.c_str();
-					transform(lowercode.begin(), lowercode.end(), lowercode.begin(), ::tolower);
-					SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, lowercode.c_str());
-					LogMessage("Logon code saved.");
-				}
-			}
+		std::stringstream ss(cmd);
+		char delim = ' ';
+		std::string item;
+		getline(ss, item, delim); // skip .sqc here
+		if (getline(ss, item, delim) && item.size()) {
+			std::string lowercode;
+			transform(item.begin(), item.end(), std::back_inserter(lowercode), ::tolower);
+			SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, lowercode.c_str());
+			LogMessage(std::format("Logon code {} is saved to settings", lowercode));
 			LogMessage(MSG_LOGON_CODE_SAVED, LOG_LEVEL_INFO);
+			return true;
 		}
-		catch (std::runtime_error const& e)
-		{
-			LogMessage(std::format("Error: {}", e.what()), LOG_LEVEL_NOTE);
-		}
-		return true;
 	}
 	return false;
 }

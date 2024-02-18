@@ -158,11 +158,13 @@ public:
 
 	auto GetManagedAircraft(CFlightPlan) -> std::shared_ptr<SeqNode>;
 	auto PatchAircraftStatus(CFlightPlan, int) -> void;
+	auto SetQueueFromJson(const std::string&, const std::string&) -> void;
+
 	virtual auto OnCompileCommand(const char*) -> bool;
 	virtual auto OnGetTagItem(CFlightPlan, CRadarTarget,
 		int, int, char[16], int*, COLORREF*, double*) -> void;
 	virtual auto OnFunctionCall(int, const char*, POINT, RECT) -> void;
-	auto SetQueueFromJson(const std::string&, const std::string&) -> void;
+	virtual auto OnFlightPlanControllerAssignedDataUpdate(CFlightPlan, int) -> void;
 
 private:
 	int timer_interval_ = 5;

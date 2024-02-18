@@ -450,6 +450,36 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 	}
 }
 
+auto UniSequence::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan fp, int DataType) -> void
+{
+	if (!fp.IsValid() || !fp.GetTrackingControllerIsMe()) return; // only tracked ac will be updated
+	if (DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG) {
+		std::string state = fp.GetGroundState();
+		bool cleared = fp.GetClearenceFlag();
+		LogMessage(std::format("Handling CTR_DATA update event, TYPE: {} state: {}, flag: {}", DataType, state, cleared));
+		if (state.empty()) {
+			if (!cleared) {
+				PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFCR);
+			}
+			else {
+				PatchAircraftStatus(fp, AIRCRAFT_STATUS_CLRD);
+			}
+		}
+		else if (state == "STUP") {
+			PatchAircraftStatus(fp, AIRCRAFT_STATUS_PUSH);
+		}
+		else if (state == "PUSH") {
+			PatchAircraftStatus(fp, AIRCRAFT_STATUS_PUSH);
+		}
+		else if (state == "TAXI") {
+			PatchAircraftStatus(fp, AIRCRAFT_STATUS_TAXI);
+		}
+		else if (state == "DEPA") {
+			PatchAircraftStatus(fp, AIRCRAFT_STATUS_TOGA);
+		}
+	}
+}
+
 auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void
 {
 	const auto& is_same_airport = [&](auto& airport) {

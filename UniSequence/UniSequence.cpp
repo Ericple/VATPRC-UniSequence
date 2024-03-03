@@ -17,7 +17,7 @@ auto UniSequence::LogMessage(const std::string& message, const int& level) -> vo
 	// LOG_LEVEL_DEBG
 	std::lock_guard<std::mutex> guard(log_lock_);
 	if (log_file.size()) {
-		log_stream_.open(log_file, std::ios::app);
+		std::ofstream log_stream_(log_file, std::ios::app);
 		if (log_stream_.is_open()) {
 			log_stream_ << std::format("[{:%T}] {}", std::chrono::system_clock::now(), message) << std::endl;
 			log_stream_.close();
@@ -172,15 +172,31 @@ auto UniSequence::CallItemFunction(const char* sCallsign, const char* sItemPlugI
 	}
 }
 
+auto UniSequence::GetLogonCode(void) -> void
+{
+	std::lock_guard<std::mutex> guard(code_lock_);
+	std::ifstream infile(dll_path + LOGON_CODE_FILE_NAME);
+	if (infile.is_open()) {
+		infile >> logon_code_;
+		infile.close();
+		LogMessage(std::format("Logon code {} is acquired", logon_code_));
+	}
+}
+
+auto UniSequence::SetLogonCode(const std::string& code) -> void
+{
+	std::lock_guard<std::mutex> guard(code_lock_);
+	std::ofstream outfile(dll_path + LOGON_CODE_FILE_NAME);
+	if (outfile.is_open()) {
+		outfile << code;
+		outfile.close();
+		LogMessage(std::format("Logon code {} is saved to settings", code));
+	}
+}
+
 auto UniSequence::InitializeLogEnv(void) -> void
 {
-	// find dll path
-	AFX_MANAGE_STATE(AfxGetStaticModuleState());
-	HMODULE pluginModule = AfxGetInstanceHandle();
-	TCHAR pBuffer[MAX_PATH] = { 0 };
-	GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
-	std::string currentPath = pBuffer;
-	log_file = currentPath.substr(0, currentPath.find_last_of("\\/") + 1) + LOG_FILE_NAME;
+	log_file = dll_path + LOG_FILE_NAME;
 	remove(log_file.c_str());
 	LogMessage("UniSequence initializing");
 }
@@ -197,6 +213,14 @@ UniSequence::UniSequence(void) : CPlugIn(
 	PLUGIN_NAME, PLUGIN_VER, PLUGIN_AUTHOR, PLUGIN_COPYRIGHT
 )
 {
+	// find dll path
+	AFX_MANAGE_STATE(AfxGetStaticModuleState());
+	HMODULE pluginModule = AfxGetInstanceHandle();
+	TCHAR pBuffer[MAX_PATH] = { 0 };
+	GetModuleFileName(pluginModule, pBuffer, sizeof(pBuffer) / sizeof(TCHAR) - 1);
+	std::string currentPath = pBuffer;
+	dll_path = currentPath.substr(0, currentPath.find_last_of("\\/") + 1);
+
 	InitializeLogEnv();
 	// Registering a Tag Object for EuroScope
 	InitTagItem();
@@ -277,8 +301,7 @@ auto UniSequence::CustomCommandHanlder(std::string cmd) -> bool
 		if (getline(ss, item, delim) && item.size()) {
 			std::string lowercode;
 			transform(item.begin(), item.end(), std::back_inserter(lowercode), ::tolower);
-			SaveDataToSettings(PLUGIN_SETTING_KEY_LOGON_CODE, PLUGIN_SETTING_DESC_LOGON_CODE, lowercode.c_str());
-			LogMessage(std::format("Logon code {} is saved to settings", lowercode));
+			SetLogonCode(lowercode);
 			LogMessage(MSG_LOGON_CODE_SAVED, LOG_LEVEL_INFO);
 			return true;
 		}
@@ -298,8 +321,7 @@ auto UniSequence::PatchAircraftStatus(CFlightPlan fp, int status) -> void
 {
 	std::string cs = fp.GetCallsign();
 	LogMessage(std::format("Attempting to patch status of {}", cs));
-	auto logon_code_setting = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-	logon_code_ = logon_code_setting != nullptr ? logon_code_setting : "";
+	GetLogonCode();
 	if (!logon_code_.size())
 	{
 		LogMessage(ERR_LOGON_CODE_NULLREF, LOG_LEVEL_NOTE);
@@ -386,8 +408,7 @@ auto UniSequence::ReorderAircraftEditHandler(std::shared_ptr<SeqNode> thisAc, CF
 	std::string beforeKey = sItemString;
 	if (thisAc == nullptr) return;
 	LogMessage("Function: SEQUENCE_TAGITEM_FUNC_REORDER_EDITED was called");
-	auto logon_code_setting = GetDataFromSettings(PLUGIN_SETTING_KEY_LOGON_CODE);
-	logon_code_ = logon_code_setting != nullptr ? logon_code_setting : "";
+	GetLogonCode();
 	if (!logon_code_.size())
 	{
 		LogMessage(ERR_LOGON_CODE_NULLREF, LOG_LEVEL_NOTE);

@@ -81,8 +81,7 @@ constexpr auto STATUS_TEXT_FORMAT_STRING = "%02d%s";
 #endif // !AIRCRAFT_STATUS
 
 #ifndef PLUGIN_SETTING_KEYS
-constexpr auto PLUGIN_SETTING_KEY_LOGON_CODE = "logonstr";
-constexpr auto PLUGIN_SETTING_DESC_LOGON_CODE = "logon code for VATPRC";
+constexpr auto LOGON_CODE_FILE_NAME = "uniseq.txt";
 #endif // !PLUGIN_SETTING_KEYS
 
 #ifndef MESSAGE
@@ -151,10 +150,8 @@ public:
 	UniSequence();
 	~UniSequence();
 
-	std::ofstream log_stream_;
 	std::map<std::string, int> socket_list_; // airport ICAO -> socket ID
 	std::set<std::string> airport_list_;
-	std::mutex log_lock_;
 	std::shared_mutex queue_cache_lock_, airport_list_lock_, socket_list_lock_;
 
 	auto GetManagedAircraft(CFlightPlan) -> std::shared_ptr<SeqNode>;
@@ -170,8 +167,10 @@ public:
 
 private:
 	int timer_interval_ = 5;
+	std::string dll_path;
 	std::string logon_code_;
 	std::string log_file;
+	std::mutex log_lock_, code_lock_;
 	nlohmann::json queue_caches_; // has a shared_lock
 
 	// for StartTagFunction
@@ -201,6 +200,7 @@ private:
 	auto InitWsThread(void) -> void;
 	auto InitPatchThread(void) -> void;
 	auto CallItemFunction(const char*, const char*, int, const char*, const char*, int, POINT, RECT) -> void;
-
+	auto GetLogonCode(void) -> void;
+	auto SetLogonCode(const std::string&) -> void;
 };
 

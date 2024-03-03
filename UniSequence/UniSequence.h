@@ -1,4 +1,5 @@
 #pragma once
+#include "UniScreen.h"
 
 using namespace EuroScopePlugIn;
 
@@ -165,12 +166,17 @@ public:
 		int, int, char[16], int*, COLORREF*, double*) -> void;
 	virtual auto OnFunctionCall(int, const char*, POINT, RECT) -> void;
 	virtual auto OnFlightPlanControllerAssignedDataUpdate(CFlightPlan, int) -> void;
+	virtual auto OnRadarScreenCreated(const char*, bool, bool, bool, bool) -> CRadarScreen*;
 
 private:
 	int timer_interval_ = 5;
 	std::string logon_code_;
 	std::string log_file;
 	nlohmann::json queue_caches_; // has a shared_lock
+
+	// for StartTagFunction
+	std::stack<std::shared_ptr<UniScreen>> screen_stack;
+	bool suppress_update; // to prevent OnFlightPlanControllerAssignedDataUpdate loop
 
 	// threading by task
 	std::jthread sync_thread;
@@ -194,6 +200,7 @@ private:
 	auto ReorderAircraftEditHandler(std::shared_ptr<SeqNode>, CFlightPlan, const char*) -> void;
 	auto InitWsThread(void) -> void;
 	auto InitPatchThread(void) -> void;
+	auto CallItemFunction(const char*, const char*, int, const char*, const char*, int, POINT, RECT) -> void;
 
 };
 

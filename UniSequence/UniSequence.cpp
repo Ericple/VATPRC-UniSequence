@@ -159,6 +159,19 @@ auto UniSequence::InitPatchThread(void) -> void
 		});
 }
 
+auto UniSequence::CallItemFunction(const char* sCallsign, const char* sItemPlugInName, int ItemCode, const char* sItemString, const char* sFunctionPlugInName, int FunctionId, POINT Pt, RECT Area) -> void
+{
+	while (!screen_stack.empty()) {
+		auto& s = screen_stack.top();
+		if (s->m_Opened)
+			return s->StartTagFunction(sCallsign, sItemPlugInName, ItemCode, sItemString, sFunctionPlugInName, FunctionId, Pt, Area);
+		else {
+			s.reset();
+			screen_stack.pop();
+		}
+	}
+}
+
 auto UniSequence::InitializeLogEnv(void) -> void
 {
 	// find dll path
@@ -292,6 +305,7 @@ auto UniSequence::PatchAircraftStatus(CFlightPlan fp, int status) -> void
 		LogMessage(ERR_LOGON_CODE_NULLREF, LOG_LEVEL_NOTE);
 		return;
 	}
+	// TODO: update local cache first
 	std::unique_lock patchLock(patch_request_queue_lock_);
 	PRequest pReq(fp, status);
 	patch_request_queue.push(pReq);
@@ -415,34 +429,82 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 		break;
 	case FUNC_SWITCH_TO_WFCR:
 		LogMessage("Function: FUNC_SWITCH_TO_WFCR was called");
+		suppress_update = true;
+		fp.GetControllerAssignedData().SetScratchPadString("NSTS");
+		if (fp.GetClearenceFlag()) {
+			CallItemFunction(fp.GetCallsign(), nullptr, 0, nullptr, nullptr, TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, pt, area);
+		}
+		suppress_update = false;
 		PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFCR);
 		break;
 	case FUNC_SWITCH_TO_CLRD:
 		LogMessage("Function: FUNC_SWITCH_TO_CLRD was called");
+		suppress_update = true;
+		fp.GetControllerAssignedData().SetScratchPadString("NSTS");
+		if (!fp.GetClearenceFlag()) {
+			CallItemFunction(fp.GetCallsign(), nullptr, 0, nullptr, nullptr, TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, pt, area);
+		}
+		suppress_update = false;
 		PatchAircraftStatus(fp, AIRCRAFT_STATUS_CLRD);
 		break;
 	case FUNC_SWITCH_TO_WFPU:
 		LogMessage("Function: FUNC_SWITCH_TO_WFPU was called");
+		suppress_update = true;
+		fp.GetControllerAssignedData().SetScratchPadString("NSTS");
+		if (!fp.GetClearenceFlag()) {
+			CallItemFunction(fp.GetCallsign(), nullptr, 0, nullptr, nullptr, TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, pt, area);
+		}
+		suppress_update = false;
 		PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFPU);
 		break;
 	case FUNC_SWITCH_TO_PUSH:
 		LogMessage("Function: FUNC_SWITCH_TO_PUSH was called");
+		suppress_update = true;
+		fp.GetControllerAssignedData().SetScratchPadString("PUSH");
+		if (!fp.GetClearenceFlag()) {
+			CallItemFunction(fp.GetCallsign(), nullptr, 0, nullptr, nullptr, TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, pt, area);
+		}
+		suppress_update = false;
 		PatchAircraftStatus(fp, AIRCRAFT_STATUS_PUSH);
 		break;
 	case FUNC_SWITCH_TO_WFTX:
 		LogMessage("Function: FUNC_SWITCH_TO_WFTX was called");
+		suppress_update = true;
+		fp.GetControllerAssignedData().SetScratchPadString("PUSH");
+		if (!fp.GetClearenceFlag()) {
+			CallItemFunction(fp.GetCallsign(), nullptr, 0, nullptr, nullptr, TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, pt, area);
+		}
+		suppress_update = false;
 		PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFTX);
 		break;
 	case FUNC_SWITCH_TO_TAXI:
 		LogMessage("Function: FUNC_SWITCH_TO_TAXI was called");
+		suppress_update = true;
+		fp.GetControllerAssignedData().SetScratchPadString("TAXI");
+		if (!fp.GetClearenceFlag()) {
+			CallItemFunction(fp.GetCallsign(), nullptr, 0, nullptr, nullptr, TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, pt, area);
+		}
+		suppress_update = false;
 		PatchAircraftStatus(fp, AIRCRAFT_STATUS_TAXI);
 		break;
 	case FUNC_SWITCH_TO_WFTO:
 		LogMessage("Function: FUNC_SWITCH_TO_WFTO was called");
+		suppress_update = true;
+		fp.GetControllerAssignedData().SetScratchPadString("TAXI");
+		if (!fp.GetClearenceFlag()) {
+			CallItemFunction(fp.GetCallsign(), nullptr, 0, nullptr, nullptr, TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, pt, area);
+		}
+		suppress_update = false;
 		PatchAircraftStatus(fp, AIRCRAFT_STATUS_WFTO);
 		break;
 	case FUNC_SWITCH_TO_TOGA:
 		LogMessage("Function: FUNC_SWITCH_TO_TOGA was called");
+		suppress_update = true;
+		fp.GetControllerAssignedData().SetScratchPadString("DEPA");
+		if (!fp.GetClearenceFlag()) {
+			CallItemFunction(fp.GetCallsign(), nullptr, 0, nullptr, nullptr, TAG_ITEM_FUNCTION_SET_CLEARED_FLAG, pt, area);
+		}
+		suppress_update = false;
 		PatchAircraftStatus(fp, AIRCRAFT_STATUS_TOGA);
 		break;
 	default:
@@ -452,7 +514,7 @@ auto UniSequence::OnFunctionCall(int fId, const char* sItemString, POINT pt, REC
 
 auto UniSequence::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan fp, int DataType) -> void
 {
-	if (!fp.IsValid() || !fp.GetTrackingControllerIsMe()) return; // only tracked ac will be updated
+	if (!fp.IsValid() || !fp.GetTrackingControllerIsMe() || suppress_update) return; // only tracked ac will be updated
 	if (DataType == CTR_DATA_TYPE_GROUND_STATE || DataType == CTR_DATA_TYPE_CLEARENCE_FLAG) {
 		std::string state = fp.GetGroundState();
 		bool cleared = fp.GetClearenceFlag();
@@ -478,6 +540,13 @@ auto UniSequence::OnFlightPlanControllerAssignedDataUpdate(CFlightPlan fp, int D
 			PatchAircraftStatus(fp, AIRCRAFT_STATUS_TOGA);
 		}
 	}
+}
+
+auto UniSequence::OnRadarScreenCreated(const char* sDisplayName, bool NeedRadarContent, bool GeoReferenced, bool CanBeSaved, bool CanBeCreated) -> CRadarScreen*
+{
+	auto screen = std::make_shared<UniScreen>();
+	screen_stack.push(screen);
+	return screen.get();
 }
 
 auto UniSequence::AddAirportIfNotExist(const std::string& dep_airport) -> void

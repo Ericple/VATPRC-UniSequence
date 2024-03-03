@@ -38,6 +38,7 @@
 #include <map>
 #include <vector>
 #include <queue>
+#include <stack>
 // others
 #include <algorithm>
 

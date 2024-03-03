@@ -108,6 +108,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="lib\include\EuroScopePlugIn.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="UniScreen.h" />
     <ClInclude Include="UniSequence.h" />
     <ClInclude Include="websocket_endpoint.h" />
   </ItemGroup>

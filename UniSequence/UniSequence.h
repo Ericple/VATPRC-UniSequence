@@ -19,6 +19,7 @@ constexpr auto PLUGIN_NAME = "UniSequence";
 constexpr auto PLUGIN_VER = "v2.0.5-nightly";
 constexpr auto PLUGIN_AUTHOR = "Ericple Garrison";
 constexpr auto PLUGIN_COPYRIGHT = "AGPL-3.0 license";
+
 #endif
 
 #ifndef Code

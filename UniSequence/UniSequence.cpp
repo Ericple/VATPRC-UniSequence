@@ -613,7 +613,6 @@ auto UniSequence::OnGetTagItem(CFlightPlan fp, CRadarTarget rt, int itemCode, in
 		}
 		if (seqadd) seqNum++;
 	}
-
 	if (seqNum > 99) seqNum = 99;// you won't want to say "Your sequence number is one hundred and fivty nine"
 
 	int bufferSize = strlen(STATUS_TEXT_PLACE_HOLDER) + 1;// Get buffer length from status
